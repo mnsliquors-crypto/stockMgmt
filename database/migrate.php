@@ -7,6 +7,7 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__ . '/../classes/DBConnection.php';
 $db = new DBConnection();
 $columns = [
+    'account_list' => ['account_no' => 'VARCHAR(100) NULL', 'bank_name' => 'VARCHAR(160) NULL'],
     'entity_list' => ['created_by' => 'INT NULL', 'updated_by' => 'INT NULL'],
     'item_list' => ['created_by' => 'INT NULL', 'updated_by' => 'INT NULL'],
     'transaction_items' => ['unit' => 'VARCHAR(50) NULL', 'cost_recorded' => 'TINYINT(1) NOT NULL DEFAULT 0'],
@@ -25,4 +26,6 @@ foreach ($columns as $table => $definitions) {
         }
     }
 }
+require_once __DIR__ . '/migrations/001_accounting.php';
+migrate_accounting($db->conn);
 echo "Schema is up to date.\n";

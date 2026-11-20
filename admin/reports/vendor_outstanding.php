@@ -18,9 +18,9 @@ $qry = $conn->query("
         v.id as vid,
         COALESCE(v.display_name,'Unknown') as vendor_name,
         COALESCE(v.contact,'') as contact,
-        t.total_amount as total_purchase,
-        (SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return')) as total_paid_returned,
-        (t.total_amount - (SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return'))) as pending_amount
+        (t.total_amount + t.tax) as total_purchase,
+        (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return')) as total_paid_returned,
+        ((t.total_amount + t.tax) - (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return'))) as pending_amount
     FROM transactions t
     LEFT JOIN entity_list v ON t.entity_id = v.id AND v.entity_type = 'Supplier'
     WHERE t.type = 'purchase' {$and_vendor} {$and_date}

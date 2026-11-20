@@ -4,5 +4,5 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteRule (^|/)\. - [F,L]
-    RewriteRule ^(database|temp|tests)(/|$) - [F,L]
+    RewriteRule ^(database|temp|tmp|tests)(/|$) - [F,L]
 </IfModule>

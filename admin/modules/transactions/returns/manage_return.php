@@ -2,7 +2,7 @@
 if(isset($_GET['id'])){
     // Fetch from transactions with correct entity name joining
     $qry = $conn->query("SELECT t.*, t.reference_code as return_code, t.entity_id as vendor_id, 
-                        (CASE WHEN t.entity_type = 'vendor' THEN v.name WHEN t.entity_type = 'customer' THEN c.name ELSE 'N/A' END) as entity_name 
+                        (CASE WHEN LOWER(t.entity_type) IN ('vendor','supplier') THEN v.display_name WHEN LOWER(t.entity_type) = 'customer' THEN c.display_name ELSE 'N/A' END) as entity_name
                         FROM `transactions` t 
                         LEFT JOIN entity_list v ON t.entity_id = v.id AND v.entity_type = 'Supplier'
                         LEFT JOIN entity_list c ON t.entity_id = c.id AND c.entity_type = 'Customer' 
@@ -259,6 +259,12 @@ if(isset($_GET['id'])){
                     </tfoot>
                 </table>
                 <div class="row">
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="return-tax" class="text-info control-label">Tax Credit</label>
+                            <input type="number" min="0" step="0.01" name="tax" id="return-tax" class="form-control form-control-sm text-right" value="<?php echo htmlspecialchars((string)($tax ?? '0'),ENT_QUOTES,'UTF-8') ?>">
+                        </div>
+                    </div>
                     <div class="col-md-12">
                         <div class="form-group">
                             <label for="remarks" class="text-info control-label">Remarks / Reason</label>

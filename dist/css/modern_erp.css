@@ -485,20 +485,45 @@ li {
 }
 
 /* Responsive Overrides */
+.accounting-workspace { min-width: 0; }
+.accounting-workspace .select2-container { width: 100% !important; min-width: 0; max-width: 100%; }
+.ns-search > .dropdown i { position: static; transform: none; }
 @media (max-width: 991px) {
+    .erp-header-top { height: auto; min-height: 50px; padding: 8px 12px; flex-wrap: wrap; gap: 10px; }
+    .ns-logo { font-size: 1rem; white-space: nowrap; }
+    .header-right { margin-left: auto; gap: 8px !important; }
+    .header-right .action-icons { display: none !important; }
+    .erp-nav-bar { position: relative; padding: 0 12px; flex-shrink: 0; }
+    .erp-footer { flex-wrap: wrap; gap: 8px; }
     .ns-menu {
         display: none;
-    }
-
-    .ns-search {
-        flex: 1;
-        margin: 0 1rem;
-        width: 100%;
-    }
-
-    .ns-search.d-flex {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        height: auto;
+        max-height: calc(100vh - 150px);
+        overflow-y: auto;
         flex-direction: column;
-        align-items: stretch !important;
-        gap: 10px !important;
+        background: var(--ns-menu-bg);
+        z-index: 1100;
+    }
+    .ns-menu.is-open { display: flex; }
+    .ns-menu-item > .ns-menu-link { display: flex; width: 100%; min-height: 44px; justify-content: space-between; }
+    .ns-menu .ns-dropdown, .ns-menu .ns-sub-dropdown { position: static; width: 100%; min-width: 0 !important; box-shadow: none; }
+    .ns-menu-item:not(.is-open) > .ns-dropdown, .ns-has-sub:not(.is-open) > .ns-sub-dropdown { display: none !important; }
+    .ns-menu-item.is-open > .ns-dropdown, .ns-has-sub.is-open > .ns-sub-dropdown { display: block; visibility: visible; opacity: 1; }
+    .ns-search {
+        flex: 1 1 100%;
+        order: 3;
+        margin: 0;
+        width: 100%;
+        min-width: 0;
+    }
+    .ns-search > div:first-child { min-width: 0; }
+    .ns-search.d-flex {
+        flex-direction: row;
+        align-items: center !important;
+        gap: 8px !important;
     }
 }

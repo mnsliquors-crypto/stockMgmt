@@ -18,9 +18,9 @@ $qry = $conn->query("
         COALESCE(c.id, 0) as cust_id,
         COALESCE(c.display_name, 'Walk-in') as customer_name,
         COALESCE(c.contact, '') as contact,
-        t.total_amount as total_sales,
-        (SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return')) as total_received_returned,
-        (t.total_amount - (SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return'))) as balance_due
+        (t.total_amount + t.tax) as total_sales,
+        (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return')) as total_received_returned,
+        ((t.total_amount + t.tax) - (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return'))) as balance_due
     FROM transactions t
     LEFT JOIN entity_list c ON t.entity_id = c.id AND c.entity_type = 'Customer'
     WHERE t.type = 'sale' {$and_cust} {$and_date}

@@ -34,7 +34,8 @@ function enforce_request_security() {
     }
 
     foreach ([$_GET, $_POST] as $input) {
-        foreach (['id', 'item_id', 'vendor_id', 'customer_id', 'entity_id', 'account_id', 'parent_id'] as $key) {
+        foreach (['id', 'item_id', 'vendor_id', 'customer_id', 'entity_id', 'account_id', 'parent_id',
+            'from_sale_id','from_purchase_id','party_id','transaction_id','from_account_id','to_account_id'] as $key) {
             if ($key === 'id' && $relative === 'admin/modules/system/import/get_progress.php') continue;
             if (!isset($input[$key]) || $input[$key] === '') continue;
             $values = is_array($input[$key]) && $key === 'item_id' ? $input[$key] : [$input[$key]];

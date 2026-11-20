@@ -1,8 +1,10 @@
 <?php
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/Accounting/Money.php';
 Class Master extends DBConnection {
     private $settings;
     private $cache;
+    private bool $accounting_enabled;
     
     public function __construct(){
         global $_settings;
@@ -10,6 +12,7 @@ Class Master extends DBConnection {
         parent::__construct();
         require_once __DIR__ . '/Cache.php';
         $this->cache = new Cache();
+        $this->accounting_enabled = $this->conn->query("SHOW TABLES LIKE 'gl_journals'")->num_rows > 0;
     }
     
     public function clear_cache($key = null){
@@ -54,8 +57,7 @@ Class Master extends DBConnection {
                 || (float)$quantities[$key] < 1 || (float)$prices[$key] < 0) {
                 throw new InvalidArgumentException('Each item needs a valid quantity and a nonnegative price.');
             }
-            $totals[$key] = round((float)$quantities[$key] * (float)$prices[$key], 2);
-            if (!is_finite($totals[$key])) throw new InvalidArgumentException('Item total is too large.');
+            $totals[$key] = App\Accounting\Money::multiply($quantities[$key],$prices[$key]);
         }
         return $totals;
     }
@@ -873,7 +875,8 @@ Class Master extends DBConnection {
         $this->conn->begin_transaction();
         try {
             // STEP 1: Find or Create Master Sale for this date AND customer
-            $sale_stmt = $this->conn->prepare("SELECT id, reference_code, total_amount FROM `transactions` WHERE type='sale' AND DATE(transaction_date) = ? AND (entity_id = ? OR (entity_id IS NULL AND ? IS NULL)) AND remarks LIKE '%[POS]%' LIMIT 1");
+            $unposted_sale = $this->accounting_enabled ? " AND NOT EXISTS (SELECT 1 FROM gl_journals WHERE source_transaction_id=transactions.id AND status='posted')" : '';
+            $sale_stmt = $this->conn->prepare("SELECT id, reference_code, total_amount FROM `transactions` WHERE type='sale' AND DATE(transaction_date) = ? AND (entity_id = ? OR (entity_id IS NULL AND ? IS NULL)) AND remarks LIKE '%[POS]%' $unposted_sale LIMIT 1 FOR UPDATE");
             $sale_stmt->bind_param("sss", $pos_date, $customer_id, $customer_id);
             $sale_stmt->execute();
             $sale_res = $sale_stmt->get_result();
@@ -2515,6 +2518,8 @@ Class Master extends DBConnection {
         extract($_POST);
         try {
             $total = $this->line_totals($item_id ?? null, $qty ?? null, $price ?? null);
+            $tax = App\Accounting\Money::decimal($_POST['tax'] ?? '0');
+            if (App\Accounting\Money::compare($tax,'0') < 0) throw new InvalidArgumentException('Tax credit cannot be negative.');
         } catch (InvalidArgumentException $e) {
             return json_encode(['status' => 'failed', 'msg' => $e->getMessage()]);
         }
@@ -2540,15 +2545,15 @@ Class Master extends DBConnection {
                 $affected_items = $this->transaction_item_ids($id);
             }
             if(empty($id)){
-                $sql = "INSERT INTO `transactions` (`reference_code`, `type`, `entity_type`, `entity_id`, `total_amount`, `remarks`, `transaction_date`, `created_by`, `parent_id`) VALUES (?, 'return', ?, ?, ?, ?, ?, ?, ?)";
+                $sql = "INSERT INTO `transactions` (`reference_code`, `type`, `entity_type`, `entity_id`, `total_amount`, `remarks`, `transaction_date`, `created_by`, `parent_id`, `tax`) VALUES (?, 'return', ?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $this->conn->prepare($sql);
                 $p_id = !empty($parent_id) ? $parent_id : null;
-                $stmt->bind_param("ssidssii", $return_code, $entity_type, $vendor_id, $amount, $remarks, $transaction_date, $user_id, $p_id);
+                $stmt->bind_param("ssidssiis", $return_code, $entity_type, $vendor_id, $amount, $remarks, $transaction_date, $user_id, $p_id, $tax);
             }else{
-                $sql = "UPDATE `transactions` SET `entity_type` = ?, `entity_id` = ?, `total_amount` = ?, `remarks` = ?, `transaction_date` = ?, `updated_by` = ?, `parent_id` = ? WHERE id = ? AND type='return'";
+                $sql = "UPDATE `transactions` SET `entity_type` = ?, `entity_id` = ?, `total_amount` = ?, `remarks` = ?, `transaction_date` = ?, `updated_by` = ?, `parent_id` = ?, `tax` = ? WHERE id = ? AND type='return'";
                 $stmt = $this->conn->prepare($sql);
                 $p_id = !empty($parent_id) ? $parent_id : null;
-                $stmt->bind_param("sidssiii", $entity_type, $vendor_id, $amount, $remarks, $transaction_date, $user_id, $p_id, $id);
+                $stmt->bind_param("sidssiisi", $entity_type, $vendor_id, $amount, $remarks, $transaction_date, $user_id, $p_id, $tax, $id);
             }
             
             if(!$stmt->execute()) throw new Exception($this->conn->error);
@@ -3140,9 +3145,9 @@ function get_balances_by_date(){
         $bill_type = $type === 2 ? 'purchase' : 'sale';
         // Keep fully paid bills visible when editing the payment that settled them.
         $sql = "SELECT t.id, t.reference_code AS code, t.transaction_date AS date_created,
-                       t.total_amount AS amount, t.total_amount - COALESCE(SUM(p.total_amount), 0) AS outstanding
+                       (t.total_amount + t.tax) AS amount, (t.total_amount + t.tax) - COALESCE(SUM(p.total_amount + p.tax), 0) AS outstanding
                 FROM transactions t
-                LEFT JOIN transactions p ON p.parent_id = t.id AND p.type = 'payment'
+                LEFT JOIN transactions p ON p.parent_id = t.id AND p.type IN ('payment','return')
                 WHERE t.type = ? AND t.entity_id = ?
                 GROUP BY t.id
                 HAVING outstanding > 0.001 OR SUM(CASE WHEN p.reference_code = ? THEN 1 ELSE 0 END) > 0
@@ -3266,10 +3271,10 @@ function get_balances_by_date(){
                 
                 if($alloc_amount <= 0) continue;
                 $bill_type = (int)$type === 2 ? 'purchase' : 'sale';
-                $invoice = $this->queryPrepared('SELECT total_amount FROM transactions WHERE id=? AND entity_id=? AND type=? FOR UPDATE',
+                $invoice = $this->queryPrepared('SELECT (total_amount + tax) AS total_amount FROM transactions WHERE id=? AND entity_id=? AND type=? FOR UPDATE',
                     'iis', [$inv_id, $party_id, $bill_type])->fetch_assoc();
                 if (!$invoice || !is_finite($alloc_amount)) throw new Exception('Invalid invoice allocation.');
-                $paid = $this->queryPrepared("SELECT COALESCE(SUM(total_amount), 0) AS paid FROM transactions WHERE parent_id=? AND type='payment'",
+                $paid = $this->queryPrepared("SELECT COALESCE(SUM(total_amount + tax), 0) AS paid FROM transactions WHERE parent_id=? AND type IN ('payment','return')",
                     'i', [$inv_id])->fetch_assoc()['paid'];
                 if ($alloc_amount > (float)$invoice['total_amount'] - (float)$paid + 0.001) {
                     throw new Exception('Payment exceeds the outstanding invoice balance.');
@@ -3446,7 +3451,8 @@ function get_balances_by_date(){
         $date = date('Y-m-d', strtotime($date));
         
         // 2. Search for existing adjustment transfer on this date
-        $chk = $this->conn->query("SELECT id, reference_code, total_amount FROM `transactions` WHERE type='transfer' AND remarks = '{$remarks}' AND DATE(transaction_date) = '{$date}' LIMIT 1");
+        $unposted_transfer = $this->accounting_enabled ? " AND NOT EXISTS (SELECT 1 FROM gl_journals WHERE source_transaction_id=transactions.id AND status='posted')" : '';
+        $chk = $this->conn->query("SELECT id, reference_code, total_amount FROM `transactions` WHERE type='transfer' AND remarks = '{$remarks}' AND DATE(transaction_date) = '{$date}' $unposted_transfer LIMIT 1 FOR UPDATE");
         
         if($chk->num_rows > 0){
             $row = $chk->fetch_assoc();

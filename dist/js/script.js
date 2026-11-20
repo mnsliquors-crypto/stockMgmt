@@ -54,6 +54,22 @@ if (typeof $.fn.select2 !== 'undefined') {
 }
 
 $(document).ready(function () {
+    $('#erp-mobile-menu-toggle').on('click', function () {
+        const open = $('#erp-main-menu').toggleClass('is-open').hasClass('is-open');
+        $(this).attr('aria-expanded', String(open));
+    });
+    $('#erp-main-menu').on('click', '.ns-menu-link, .ns-has-sub > .ns-dropdown-link', function (event) {
+        if (window.matchMedia('(max-width: 991px)').matches && $(this).attr('href') === '#') {
+            event.preventDefault();
+            $(this).parent().toggleClass('is-open');
+        }
+    });
+    $(document).on('keydown', function (event) {
+        if (event.key === 'Escape') {
+            $('#erp-main-menu').removeClass('is-open');
+            $('#erp-mobile-menu-toggle').attr('aria-expanded', 'false');
+        }
+    });
 	// Initialize all Select2 elements on page load
 	init_select2();
 

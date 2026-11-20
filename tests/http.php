@@ -74,6 +74,25 @@ try {
         'reports/account_ledger', 'reports/vat_sales', 'reports/vat_purchase', 'reports/vat_summary', 'reports/customer_statement',
         'reports/daily_purchase', 'reports/daily_expense', 'reports/pos_sales', 'reports/sales', 'reports/purchase'];
     foreach ($pages as $page) expect_status('admin/?page=' . $page, 200);
+    foreach (['journals','sources','accounts','periods','reports','audit'] as $view) {
+        expect_status('admin/?page=finance/accounting&view='.$view,200);
+    }
+    expect_status('classes/Accounting.php?f=post_journal',405);
+    expect_status('classes/Accounting.php?f=save_draft',422,[], $token);
+    $gl_accounts=array_column($db->conn->query('SELECT id,system_key FROM gl_accounts')->fetch_all(MYSQLI_ASSOC),'id','system_key');
+    $draft=['entry_date'=>date('Y-m-d'),'memo'=>'HTTP accounting fixture','request_key'=>bin2hex(random_bytes(20)),
+        'lines'=>[['account_id'=>$gl_accounts['receivables'],'debit'=>'10.10','credit'=>'0'],['account_id'=>$gl_accounts['opening_equity'],'debit'=>'0','credit'=>'10.10']]];
+    $created=json_decode(expect_status('classes/Accounting.php?f=save_draft',200,$draft,$token),true)['data']['id'];
+    $again=json_decode(expect_status('classes/Accounting.php?f=save_draft',200,$draft,$token),true)['data']['id'];
+    if ($again!==$created) throw new RuntimeException('Duplicate request created another journal');
+    expect_status('admin/?page=finance/accounting&id='.$created,200);
+    expect_status('classes/Accounting.php?f=post_journal',200,['id'=>$created],$token);
+    expect_status('classes/Accounting.php?f=discard_draft',422,['id'=>$created],$token);
+    expect_status('classes/Accounting.php?f=save_draft',422,array_merge($draft,['id'=>$created]),$token);
+    expect_status('classes/Accounting.php?f=reverse_journal',200,['id'=>$created,'entry_date'=>date('Y-m-d'),'reason'=>'Reverse HTTP fixture'],$token);
+    expect_status('classes/Accounting.php?f=report&report=balance_sheet',200);
+    $csv=expect_status('classes/Accounting.php?f=export&report=trial_balance',200);
+    if (!str_contains($csv,'Account code')) throw new RuntimeException('Missing CSV report headers');
     expect_status('admin/modules/system/import/get_progress.php?id=review_hex123', 200);
     expect_status('admin/reports/report_api.php?action=daily_sales', 200);
     expect_status('classes/Master.php?f=search_pos_items&q=%27', 200);
@@ -85,6 +104,11 @@ try {
     expect_status('classes/Login.php?f=logout', 302);
     $token = login_as($staff, $password);
     expect_status('admin/', 200);
+    expect_status('admin/?page=finance/accounting',200);
+    expect_status('classes/Accounting.php?f=create_account',403,['code'=>'NOACCESS','name'=>'Forbidden','category'=>'asset'],$token);
+    expect_status('classes/Accounting.php?f=post_journal',403,['id'=>$created],$token);
+    expect_status('classes/Accounting.php?f=close_period',403,['id'=>1,'reason'=>'Forbidden'],$token);
+    expect_status('classes/Accounting.php?f=preview_source',403,['id'=>1],$token);
     expect_status('admin/?page=system/settings', 403);
     expect_status('admin/?page=settings', 403);
     expect_status('classes/GitSync.php?f=restore', 403, [], $token);

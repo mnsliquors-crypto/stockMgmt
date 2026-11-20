@@ -84,6 +84,7 @@
                       && (int)$_settings->userdata('type') !== 1) {
                       deny_request(403, 'Administrator access required.');
                   }
+                  include __DIR__ . '/inc/posting_status.php';
                   include $include_file;
               }else{
                   http_response_code(404);

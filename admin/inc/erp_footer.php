@@ -1,6 +1,6 @@
 <?php require_once('inc/footer.php') ?>
 <!-- Modern ERP Footer Section -->
-<div class="row mt-auto">
+<div class="row mt-auto mx-0">
     <div class="col-12">
         <footer class="erp-footer">
             <span>

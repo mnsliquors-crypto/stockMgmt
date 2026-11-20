@@ -67,7 +67,8 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 
 <!-- NetSuite Layer 2: Main Navigation -->
 <nav class="erp-nav-bar">
-    <ul class="ns-menu">
+    <button type="button" id="erp-mobile-menu-toggle" class="btn btn-sm text-white d-lg-none" aria-controls="erp-main-menu" aria-expanded="false" title="Open navigation" aria-label="Open navigation"><i class="fas fa-bars"></i></button>
+    <ul class="ns-menu" id="erp-main-menu">
         <li class="ns-menu-item <?php echo $page == 'home' ? 'active' : '' ?>">
             <a href="<?php echo base_url ?>admin" class="ns-menu-link">Dashboard</a>
         </li>
@@ -101,6 +102,10 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
                 <a href="<?php echo base_url ?>admin/?page=master/bank_accounts" class="ns-dropdown-link">Accounts</a>
                 <a href="<?php echo base_url ?>admin/?page=master/accounts" class="ns-dropdown-link">Bank/Cash Accounts</a>
             </div>
+        </li>
+
+        <li class="ns-menu-item <?php echo str_contains($page, 'finance/accounting') ? 'active' : '' ?>">
+            <a href="<?php echo base_url ?>admin/?page=finance/accounting" class="ns-menu-link">Accounting</a>
         </li>
 
         <!-- Reports (2-layer flyout) -->
