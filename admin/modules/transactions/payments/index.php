@@ -95,7 +95,7 @@
 <script>
 	$(document).ready(function(){
         $('.view_data').click(function(){
-            uni_modal("Payment Details","payments/view_payment.php?id="+$(this).attr('data-id'))
+            uni_modal("Payment Details","modules/transactions/payments/view_payment.php?id="+$(this).attr('data-id'))
         })
 
         

@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../../../config.php';
 
 header('Content-Type: application/json');
 
@@ -48,7 +48,8 @@ if($headers){
 $imported = 0;
 $errors = [];
 $import_id = isset($_POST['import_id']) ? $_POST['import_id'] : uniqid();
-$progress_file = __DIR__ . "/../../uploads/progress_{$import_id}.json";
+if (!is_string($import_id) || !preg_match('/^[A-Za-z0-9_-]+$/D', $import_id)) deny_request(400, 'Invalid import ID.');
+$progress_file = base_app . "uploads/progress_{$import_id}.json";
 
 function update_progress($file, $current, $total) {
     $progress = ($total > 0) ? round(($current / $total) * 100) : 0;
@@ -168,7 +169,7 @@ try {
                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
             $stmt = $db->conn->prepare($query);
             $stmt->bind_param(
-                "ssiiidddddii",
+                "ssiisdddddii",
                 $data['name'], $description, $resolved_category_id, $resolved_supplier_id,
                 $unit, $cost, $selling_price, $opening_cost, $average_cost,
                 $reorder_level, $tax_type, $status

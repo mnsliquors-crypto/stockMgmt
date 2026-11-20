@@ -46,14 +46,14 @@
 				<tbody>
 					<?php 
 						$i = 1;
-						$qry = $conn->query("SELECT *, display_name as name, role_id as type from `entity_list` where entity_type = 'User' order by display_name asc ");
+						$qry = $conn->query("SELECT *, CONCAT(firstname, ' ', lastname) AS name FROM users ORDER BY firstname, lastname");
 						while($row = $qry->fetch_assoc()):
 					?>
 						<tr>
 							<td class="text-center"><?php echo $i++; ?></td>
 							<td class="text-center"><img src="<?php echo validate_image($row['avatar']) ?>" class="img-avatar img-thumbnail p-0 border-2" alt="user_avatar"></td>
-							<td><?php echo ucwords($row['name']) ?></td>
-							<td ><p class="m-0 truncate-1"><?php echo $row['username'] ?></p></td>
+							<td><?php echo htmlspecialchars(ucwords($row['name']), ENT_QUOTES, 'UTF-8') ?></td>
+							<td ><p class="m-0 truncate-1"><?php echo htmlspecialchars($row['username'], ENT_QUOTES, 'UTF-8') ?></p></td>
 							<td ><p class="m-0"><?php echo ($row['type'] == 1 )? "Administrator" : "Staff" ?></p></td>
 							<td align="center">
 								 <button type="button" class="btn btn-flat btn-default btn-sm dropdown-toggle dropdown-icon" data-toggle="dropdown">

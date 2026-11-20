@@ -35,7 +35,7 @@
                     <tbody>
                         <?php 
                         $i = 1;
-                        $qry = $conn->query("SELECT d.*, u.firstname, u.lastname FROM `cash_denominations` d inner join users u on d.user_id = u.id order by d.`date` desc, d.`date_created` desc");
+                        $qry = $conn->query("SELECT d.*, u.firstname, u.lastname FROM `cash_denominations` d LEFT JOIN users u ON d.created_by = u.id ORDER BY d.`date` DESC, d.`date_created` DESC");
                         while($row = $qry->fetch_assoc()):
                             // Fetch daily account balances for this date
                             $rec_date = $row['date'] ?: date('Y-m-d', strtotime($row['date_created']));

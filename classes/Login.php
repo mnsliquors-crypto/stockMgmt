@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/Passwords.php';
 class Login extends DBConnection {
 	private $settings;
 	public function __construct(){
@@ -7,7 +8,6 @@ class Login extends DBConnection {
 		$this->settings = $_settings;
 
 		parent::__construct();
-		ini_set('display_errors', 1);
 	}
 	public function __destruct(){
 		parent::__destruct();
@@ -16,14 +16,27 @@ class Login extends DBConnection {
 		echo "<h1>Access Denied</h1> <a href='".base_url."'>Go Back.</a>";
 	}
 	public function login(){
-		extract($_POST);
-
-		$stmt = $this->conn->prepare("SELECT id, firstname, lastname, username, type, avatar FROM `users` WHERE username = ? AND password = md5(?)");
-		$stmt->bind_param("ss", $username, $password);
+		return $this->authenticate(false);
+	}
+	private function authenticate($staff_only){
+        $username = is_string($_POST['username'] ?? null) ? trim($_POST['username']) : '';
+        $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
+        if ($username === '' || $password === '') return json_encode(['status' => 'incorrect']);
+		$stmt = $this->conn->prepare("SELECT id, firstname, lastname, username, password, type, avatar FROM `users` WHERE username = ? LIMIT 1");
+		$stmt->bind_param("s", $username);
 		$stmt->execute();
 		$qry = $stmt->get_result();
-		if($qry->num_rows > 0){
-			$res = $qry->fetch_assoc();
+		$res = $qry->fetch_assoc();
+        if($res && in_array((int)$res['type'], [1, 2], true)
+            && (!$staff_only || (int)$res['type'] === 2)
+            && verify_user_password($password, $res['password'])){
+            if (password_needs_rehash($res['password'], PASSWORD_DEFAULT)) {
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+                $this->queryPrepared('UPDATE users SET password = ? WHERE id = ?', 'si', [$hash, $res['id']]);
+            }
+            unset($res['password']);
+            session_regenerate_id(true);
+            unset($_SESSION['userdata']);
 			foreach($res as $k => $v){
 				$this->settings->set_userdata($k,$v);
 			}
@@ -41,23 +54,7 @@ class Login extends DBConnection {
 		}
 	}
 	function login_user(){
-		extract($_POST);
-		$stmt = $this->conn->prepare("SELECT id, firstname, lastname, username, type, avatar FROM `users` WHERE username = ? AND password = md5(?) AND `type` = 2");
-		$stmt->bind_param("ss", $username, $password);
-		$stmt->execute();
-		$qry = $stmt->get_result();
-		if($qry->num_rows > 0){
-			$res = $qry->fetch_assoc();
-			foreach($res as $k => $v){
-				$this->settings->set_userdata($k,$v);
-			}
-			$this->settings->set_userdata('login_type',2);
-			$resp['status'] = 'success';
-		}else{
-			$resp['status'] = 'incorrect';
-		}
-		$stmt->close();
-		return json_encode($resp);
+		return $this->authenticate(true);
 	}
 	public function logout_user(){
 		if($this->settings->sess_des()){

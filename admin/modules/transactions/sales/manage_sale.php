@@ -1,7 +1,7 @@
 <?php
 if(isset($_GET['id'])){
     // Fetch from unified transactions
-    $qry = $conn->query("SELECT *, reference_code as sales_code, entity_id as customer_id FROM transactions WHERE id = '{$_GET['id']}' AND type = 'sale'");
+    $qry = $conn->query("SELECT *, reference_code as sales_code, entity_id as customer_id, transaction_date AS date_sale FROM transactions WHERE id = '{$_GET['id']}' AND type = 'sale'");
     if($qry->num_rows > 0){
         foreach($qry->fetch_array() as $k => $v){
             $$k = $v;

@@ -1,6 +1,6 @@
 <?php
 if(!isset($conn) || !$conn){
-    require_once __DIR__ . '/../../config.php';
+    require_once __DIR__ . '/../../../../config.php';
 }
 if(isset($_GET['id'])){
     $qry = $conn->query("SELECT t.*, c.display_name as customer_name, c.contact as customer_contact, c.address as customer_address, c.tax_id as customer_pan, t.entity_id as customer_id, t.reference_code as sales_code, t.transaction_date as date_sale, t.total_amount as amount

@@ -13,7 +13,13 @@
         });
       </script>
       <?php endif;?>    
-     <?php $page = isset($_GET['page']) ? $_GET['page'] : 'home';  ?>
+     <?php
+       $page = $_GET['page'] ?? 'home';
+       if (!is_string($page) || !preg_match('/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/D', $page)) {
+           $page = 'invalid-page';
+           http_response_code(404);
+       }
+     ?>
       
         <!-- Main content -->
         <section class="content ">
@@ -35,6 +41,10 @@
                       } elseif(is_dir($module_path)) {
                           if(file_exists($module_path."/index.php")){
                               $include_file = $module_path."/index.php";
+                          } elseif(file_exists($module_path."/".basename($module_path)."_index.php")){
+                              $include_file = $module_path."/".basename($module_path)."_index.php";
+                          } elseif($page === 'transactions/stock_adjustments'){
+                              $include_file = $module_path."/adjustments_index.php";
                           }
                       }
                   }
@@ -48,7 +58,8 @@
                               $include_file = $module_path.".php";
                               break;
                           } elseif(is_dir($module_path)) {
-                              $include_file = $module_path."/index.php";
+                              $entry = basename($module_path) . '_index.php';
+                              $include_file = file_exists($module_path."/index.php") ? $module_path."/index.php" : $module_path."/".$entry;
                               break;
                           }
                       }
@@ -66,8 +77,16 @@
 
               // Include the resolved file or 404
               if($include_file && file_exists($include_file)){
+                  $resolved = str_replace('\\', '/', realpath($include_file));
+                  $system_root = str_replace('\\', '/', __DIR__) . '/modules/system/';
+                  if (strpos($resolved, $system_root) === 0
+                      && $resolved !== $system_root . 'users/profile.php'
+                      && (int)$_settings->userdata('type') !== 1) {
+                      deny_request(403, 'Administrator access required.');
+                  }
                   include $include_file;
               }else{
+                  http_response_code(404);
                   echo '<div class="text-center py-5">
                       <h1 class="display-4 text-muted"><i class="fas fa-exclamation-triangle"></i></h1>
                       <h3 class="text-muted">404 - Page Not Found</h3>

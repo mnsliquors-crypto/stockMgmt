@@ -1,16 +1,12 @@
 <?php
-require_once __DIR__ . '/../../classes/DBConnection.php';
-require_once __DIR__ . '/../../classes/Login.php';
-require_once __DIR__ . '/../../classes/Master.php';
+require_once __DIR__ . '/../../../../config.php';
 
-$login = new Login();
 if(!isset($_SESSION['userdata']))
 {
     header('location:../login.php');
     exit;
 }
 
-$master = new Master();
 // If this file is requested directly, redirect into admin wrapper so header/sidebar/footer remain consistent
 if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
     $type = isset($_GET['type']) ? $_GET['type'] : 'items';
@@ -314,7 +310,7 @@ if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
         validateData.append('validate_only', 1);
 
         $.ajax({
-            url: 'import/process_import.php',
+            url: _base_url_ + 'admin/modules/system/import/process_import.php',
             method: 'POST',
             data: validateData,
             processData: false,
@@ -333,7 +329,7 @@ if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
                     formData.append('import_id', import_id);
 
                     let progressInterval = setInterval(() => {
-                        $.get('import/get_progress.php?id=' + import_id, function(data) {
+                        $.get(_base_url_ + 'admin/modules/system/import/get_progress.php?id=' + import_id, function(data) {
                             if(data && data.progress !== undefined) {
                                 $(`#${progressBarId}`).css('width', data.progress + '%').text(data.progress + '%');
                                 if(data.progress >= 100) clearInterval(progressInterval);
@@ -342,7 +338,7 @@ if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
                     }, 300);
 
                     $.ajax({
-                        url: 'import/process_import.php',
+                        url: _base_url_ + 'admin/modules/system/import/process_import.php',
                         method: 'POST',
                         data: formData,
                         processData: false,

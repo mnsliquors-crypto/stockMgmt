@@ -1,5 +1,7 @@
 <?php
-require_once('../../config.php');
+require_once __DIR__ . '/../../../../config.php';
+if ((int)$_settings->userdata('type') !== 1) deny_request(403, 'Administrator access required.');
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') deny_request(405, 'Use POST for migrations.');
 
 $migrations = [
     "ALTER TABLE `cash_denominations` ADD COLUMN IF NOT EXISTS `reconciliation_status` TINYINT(1) NOT NULL DEFAULT 0",

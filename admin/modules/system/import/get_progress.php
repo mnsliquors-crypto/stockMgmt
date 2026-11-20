@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../../../config.php';
 
 header('Content-Type: application/json');
 
@@ -15,7 +15,8 @@ if(empty($id)) {
     exit;
 }
 
-$file = __DIR__ . "/../../uploads/progress_{$id}.json";
+if (!is_string($id) || !preg_match('/^[A-Za-z0-9_-]+$/D', $id)) deny_request(400, 'Invalid import ID.');
+$file = base_app . "uploads/progress_{$id}.json";
 if(file_exists($file)) {
     $data = json_decode(file_get_contents($file), true);
     echo json_encode($data);

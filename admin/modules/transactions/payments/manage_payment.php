@@ -1,6 +1,6 @@
 <?php 
 if(!isset($conn) || !$conn){
-    require_once __DIR__ . '/../../config.php';
+    require_once __DIR__ . '/../../../../config.php';
 }
 $id = $_GET['id'] ?? null;
 $account_amounts = [];
@@ -34,6 +34,7 @@ if($id){
         // Also fetch from transaction_list (for consolidated POS payments)
         $tl_qry = $conn->query("SELECT * FROM `transaction_list` WHERE ref_id = '{$id}' AND ref_table = 'transactions'");
         while($tl_row = $tl_qry->fetch_assoc()){
+            if (!empty($account_id)) continue;
             if(!isset($account_amounts[$tl_row['account_id']])) $account_amounts[$tl_row['account_id']] = 0;
             $account_amounts[$tl_row['account_id']] += floatval($tl_row['amount']);
         }

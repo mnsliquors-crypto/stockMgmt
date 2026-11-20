@@ -7,7 +7,7 @@ class Cache {
     private $expiry;
 
     public function __construct($expiry = 3600) {
-        $this->cache_dir = __DIR__ . '/../temp/cache/';
+        $this->cache_dir = rtrim(getenv('APP_CACHE_DIR') ?: __DIR__ . '/../temp/cache/', '/\\') . DIRECTORY_SEPARATOR;
         $this->expiry = $expiry;
         if (!is_dir($this->cache_dir)) {
             mkdir($this->cache_dir, 0777, true);

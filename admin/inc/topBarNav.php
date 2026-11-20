@@ -28,9 +28,9 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
                 <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=transactions/expenses/manage_expense"><i class="fas fa-money-check-alt mr-2 text-success"></i> Expense</a>
                 <div class="dropdown-divider"></div>
                 <h6 class="dropdown-header text-uppercase font-weight-bold" style="font-size:0.7rem; letter-spacing:0.5px; color:#888;">Master records</h6>
-                <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=master/items/manage_item"><i class="fas fa-box mr-2 text-secondary"></i> Item</a>
-                <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=master/customers/manage_customer"><i class="fas fa-users mr-2 text-secondary"></i> Customer</a>
-                <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=master/vendors/manage_vendor"><i class="fas fa-truck mr-2 text-secondary"></i> Vendor</a>
+                <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=master/items/manage"><i class="fas fa-box mr-2 text-secondary"></i> Item</a>
+                <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=master/customers/manage"><i class="fas fa-users mr-2 text-secondary"></i> Customer</a>
+                <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=master/vendors/manage"><i class="fas fa-truck mr-2 text-secondary"></i> Vendor</a>
             </div>
         </div>
     </div>
@@ -50,7 +50,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
                 </div>
             </div>
             <div class="dropdown-menu dropdown-menu-right shadow-lg border-0 rounded-0 mt-2 py-2" style="font-size: 0.85rem; min-width: 200px;">
-                <a class="dropdown-item px-4 py-2" href="<?php echo base_url ?>admin/?page=system/users/manage_user&id=<?php echo $_settings->userdata('id') ?>">
+                <a class="dropdown-item px-4 py-2" href="<?php echo base_url ?>admin/?page=system/users/profile">
                     <i class="far fa-user-circle mr-3"></i> My Profile
                 </a>
                 <a class="dropdown-item px-4 py-2" href="<?php echo base_url ?>admin/?page=system/settings">

@@ -126,7 +126,7 @@ if($_settings->userdata('type') != 1){
 <script>
 	$(document).ready(function(){
 		$('.view_data').click(function(){
-			uni_modal("Audit Log Details","system/audit_logs/view_log_modal.php?id="+$(this).attr('data-id'), "large")
+			uni_modal("Audit Log Details","modules/system/audit_logs/view_log_modal.php?id="+$(this).attr('data-id'), "large")
 		})
         $('#filter-form').submit(function(e){
             e.preventDefault();

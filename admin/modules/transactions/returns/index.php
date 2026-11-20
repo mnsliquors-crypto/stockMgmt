@@ -74,7 +74,7 @@
 <script>
 	$(document).ready(function(){
 		$('.view_data').click(function(){
-			uni_modal("Return Details","return/view_return.php?id="+$(this).attr('data-id'),"mid-large")
+			uni_modal("Return Details","modules/transactions/returns/view_return.php?id="+$(this).attr('data-id'),"mid-large")
 		})
 		$('.delete_data').click(function(){
 			_conf("Are you sure to delete this Return Record permanently?","delete_return",[$(this).attr('data-id')])

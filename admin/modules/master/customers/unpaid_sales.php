@@ -1,5 +1,5 @@
 <?php
-require_once('../../config.php');
+require_once __DIR__ . '/../../../../config.php';
 if(isset($_GET['id'])){
     $qry = $conn->query("SELECT *, display_name as name FROM `entity_list` where id = '{$_GET['id']}' AND entity_type = 'Customer' ");
     if($qry->num_rows > 0){

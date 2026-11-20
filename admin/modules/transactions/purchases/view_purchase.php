@@ -1,6 +1,6 @@
 <?php
 if(!isset($conn) || !$conn){
-    require_once __DIR__ . '/../../config.php';
+    require_once __DIR__ . '/../../../../config.php';
 }
 $id = $_GET['id'] ?? null;
 $qry = $conn->query("SELECT p.*, reference_code as po_code, entity_id as vendor_id, transaction_date as date_created, s.display_name as vendor_name 

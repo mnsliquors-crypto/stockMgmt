@@ -1,6 +1,6 @@
 <?php
 if(isset($_GET['id'])){
-    $qry = $conn->query("SELECT d.*, concat(u.firstname,' ',u.lastname) as user FROM `cash_denominations` d inner join users u on d.user_id = u.id where d.id = '{$_GET['id']}'");
+    $qry = $conn->query("SELECT d.*, concat(u.firstname,' ',u.lastname) as user FROM `cash_denominations` d LEFT JOIN users u ON d.created_by = u.id where d.id = '{$_GET['id']}'");
     if($qry->num_rows >0){
         foreach($qry->fetch_array() as $k => $v){
             $$k = $v;

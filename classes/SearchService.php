@@ -129,7 +129,13 @@ class SearchService {
 
     private function highlight($text, $query) {
         if (!$text) return '';
-        $query = preg_quote($query, '/');
-        return preg_replace("/($query)/i", "<b>$1</b>", $text);
+        $parts = preg_split('/(' . preg_quote($query, '/') . ')/iu', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if ($parts === false) return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        foreach ($parts as $index => &$part) {
+            $part = htmlspecialchars($part, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            if ($index % 2) $part = '<b>' . $part . '</b>';
+        }
+        unset($part);
+        return implode('', $parts);
     }
 }

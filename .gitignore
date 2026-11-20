@@ -4,6 +4,10 @@
 tmp/
 *.log
 *.tmp
+vendor/
+temp/cache/*.cache
+uploads/progress_*.json
+.env
 
 # System-generated logs and brain
 .gemini/

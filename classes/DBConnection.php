@@ -15,7 +15,9 @@ class DBConnection{
 
         if (!isset($this->conn)) {
             
-            $this->conn = new mysqli($this->host, $this->username, $this->password, $this->database);
+            mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+            $this->conn = new mysqli($this->host, $this->username, $this->password, $this->database, DB_PORT);
+            $this->conn->set_charset('utf8mb4');
             
             if (!$this->conn) {
                 echo 'Cannot connect to database server';
@@ -106,7 +108,7 @@ class DBConnection{
     }
 
     public function __destruct(){
-        $this->conn->close();
+        if ($this->conn) $this->conn->close();
     }
 }
 ?>

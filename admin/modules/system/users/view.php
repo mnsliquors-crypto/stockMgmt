@@ -3,7 +3,7 @@ if(!isset($conn) || !$conn){
     require_once __DIR__ . '/../../../../config.php';
 }
 
-$qry = $conn->query("SELECT *, display_name as name, role_id as type FROM `entity_list` where id = '{$_GET['id']}' AND entity_type = 'User'");
+$qry = $db->queryPrepared("SELECT *, CONCAT(firstname, ' ', lastname) AS name FROM users WHERE id = ?", 'i', [(int)($_GET['id'] ?? 0)]);
 if($qry->num_rows > 0){
     foreach($qry->fetch_assoc() as $k => $v){
         $$k=$v;
@@ -34,7 +34,7 @@ if($qry->num_rows > 0){
             <div class="row">
                 <div class="col-md-4 text-center border-right">
                     <img src="<?php echo validate_image($avatar ?? '') ?>" alt="User Avatar" class="img-avatar-view img-thumbnail shadow-sm mb-3">
-                    <h5 class="font-weight-bold"><?php echo ucwords($name ?? 'N/A') ?></h5>
+                    <h5 class="font-weight-bold"><?php echo htmlspecialchars(ucwords($name ?? 'N/A'), ENT_QUOTES, 'UTF-8') ?></h5>
                     <p class="text-muted"><?php echo ($type == 1) ? "Administrator" : "Staff" ?></p>
                 </div>
                 <div class="col-md-8">

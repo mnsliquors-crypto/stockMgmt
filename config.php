@@ -1,18 +1,26 @@
 <?php
 ob_start();
-ini_set('date.timezone','Asia/Manila');
-date_default_timezone_set('Asia/Manila');
-session_start();
+date_default_timezone_set(getenv('APP_TIMEZONE') ?: 'Asia/Kathmandu');
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.use_strict_mode', '1');
+    session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax',
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off']);
+    session_start();
+}
 
 require_once('initialize.php');
+require_once(__DIR__ . '/classes/Security.php');
+enforce_request_security();
 require_once('classes/DBConnection.php');
 require_once('classes/SystemSettings.php');
 $db = new DBConnection;
 $conn = $db->conn;
 
 function redirect($url=''){
-	if(!empty($url))
-	echo '<script>location.href="'.base_url .$url.'"</script>';
+	if(!empty($url)) {
+        header('Location: ' . base_url . $url);
+        exit;
+    }
 }
 function validate_image($file){
 	if(!empty($file)){
@@ -41,12 +49,12 @@ function isMobileDevice(){
 
     //Return true if Mobile User Agent is detected
     foreach($aMobileUA as $sMobileKey => $sMobileOS){
-        if(preg_match($sMobileKey, $_SERVER['HTTP_USER_AGENT'])){
+        if(preg_match($sMobileKey, $_SERVER['HTTP_USER_AGENT'] ?? '')){
             return true;
         }
     }
     //Otherwise return false..  
     return false;
 }
-ob_end_flush();
+// Keep the response buffered so page routing can set redirects and error statuses.
 ?>

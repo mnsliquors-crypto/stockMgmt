@@ -1,3 +1,8 @@
+$.ajaxPrefilter(function (options, originalOptions, xhr) {
+    var token = $('meta[name="csrf-token"]').attr('content');
+    if (token && !options.crossDomain) xhr.setRequestHeader('X-CSRF-Token', token);
+});
+
 function start_loader() {
 	$('body').append('<div id="preloader"><div class="loader-holder"><div></div><div></div><div></div><div></div>')
 }

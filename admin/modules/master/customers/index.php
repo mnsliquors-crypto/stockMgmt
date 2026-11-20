@@ -94,7 +94,7 @@
 		$('.table td,.table th').addClass('py-1 px-2 align-middle')
 		$('.table').dataTable();
         $('.accept_payment').click(function(){
-			uni_modal("<i class='fa fa-money-bill'></i> Accept Payment","modules/master/customers/unpaid_sales.php?id="+$(this).attr('data-id'),"mid-large")
+			location.href = _base_url_ + 'admin/?page=transactions/payments/manage_payment&type=1&customer_id=' + encodeURIComponent($(this).attr('data-id'));
 		})
 	})
 	function delete_customer($id){

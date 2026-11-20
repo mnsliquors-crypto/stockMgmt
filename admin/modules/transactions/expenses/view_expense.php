@@ -1,6 +1,6 @@
 <?php 
 if(!isset($conn) || !$conn){
-    require_once __DIR__ . '/../../config.php';
+    require_once __DIR__ . '/../../../../config.php';
 }
 $qry = $conn->query("SELECT e.*, a.name as account, concat(u.firstname,' ',u.lastname) as user from `transactions` e left join account_list a on e.account_id = a.id left join users u on e.created_by = u.id where e.id = '{$_GET['id']}' AND e.type='expense'");
 if($qry->num_rows >0){

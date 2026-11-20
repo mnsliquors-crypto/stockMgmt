@@ -1,118 +1,106 @@
 <?php
 require_once __DIR__ . '/../config.php';
 
-Class GitSync extends DBConnection {
+class GitSync extends DBConnection {
     private $settings;
-    
-    public function __construct(){
+
+    public function __construct() {
         global $_settings;
         $this->settings = $_settings;
         parent::__construct();
     }
-    
-    public function __destruct(){
-        parent::__destruct();
+
+    // Array commands bypass shell parsing, including for configured executable paths.
+    protected function run_command($arguments, $input = null, $output = null, $environment = []) {
+        $stderr = tmpfile();
+        if ($stderr === false) return ['return' => 1, 'output' => 'Cannot create process log.'];
+        $descriptors = [
+            0 => $input === null ? ['pipe', 'r'] : ['file', $input, 'r'],
+            1 => $output === null ? ['pipe', 'w'] : ['file', $output, 'w'],
+            2 => $stderr,
+        ];
+        $process = proc_open($arguments, $descriptors, $pipes, base_app, array_merge(getenv(), $environment));
+        if (!is_resource($process)) {
+            fclose($stderr);
+            return ['return' => 1, 'output' => 'Unable to start process.'];
+        }
+        if (isset($pipes[0])) fclose($pipes[0]);
+        $text = isset($pipes[1]) ? stream_get_contents($pipes[1]) : '';
+        if (isset($pipes[1])) fclose($pipes[1]);
+        $status = proc_close($process);
+        rewind($stderr);
+        $text .= stream_get_contents($stderr);
+        fclose($stderr);
+        return ['return' => $status, 'output' => trim($text)];
     }
 
-    /**
-     * Export database to database/sms_db.sql and push to GitHub
-     */
-    public function push_to_git(){
-        $git_path = $this->settings->info('git_path') ?: 'git';
-        $mysql_bin = $this->settings->info('mysql_bin') ?: 'C:\xampp\mysql\bin\\';
-        $db_name = DB_NAME;
-        $db_user = DB_USERNAME;
-        $db_pass = DB_PASSWORD;
-        $repo_path = base_app;
-        $sql_file = $repo_path . 'database/sms_db.sql';
+    private function mysql_binary($name) {
+        $directory = $this->settings->info('mysql_bin');
+        if (!$directory) return PHP_OS_FAMILY === 'Windows' ? 'C:\\xampp\\mysql\\bin\\' . $name . '.exe' : $name;
+        return rtrim($directory, '/\\') . DIRECTORY_SEPARATOR . $name . (PHP_OS_FAMILY === 'Windows' ? '.exe' : '');
+    }
 
-        // 1. Export Database
-        $dump_cmd = "\"{$mysql_bin}mysqldump\" -u {$db_user} " . (!empty($db_pass) ? "-p{$db_pass} " : "") . "{$db_name} > \"{$sql_file}\"";
-        exec($dump_cmd, $output, $return_var);
+    private function mysql_arguments($binary) {
+        return [$this->mysql_binary($binary), '--host=' . DB_SERVER, '--port=' . DB_PORT,
+            '--user=' . DB_USERNAME, DB_NAME];
+    }
 
-        if($return_var !== 0){
-            return json_encode(['status' => 'failed', 'msg' => 'Database export failed. Check MySQL Bin path.', 'cmd' => $dump_cmd]);
+    public function push_to_git() {
+        $sql_file = base_app . 'database/sms_db.sql';
+        $temporary = tempnam(dirname($sql_file), '.dump-');
+        if ($temporary === false) return json_encode(['status' => 'failed', 'msg' => 'Cannot create backup file.']);
+        $dump = $this->run_command($this->mysql_arguments('mysqldump'), null, $temporary, ['MYSQL_PWD' => DB_PASSWORD]);
+        if ($dump['return'] !== 0 || !rename($temporary, $sql_file)) {
+            if (is_file($temporary)) unlink($temporary);
+            return json_encode(['status' => 'failed', 'msg' => 'Database export failed; the previous backup was preserved.']);
         }
 
-        // 2. Git Operations
-        chdir($repo_path);
-        
-        $commands = [
-            "\"{$git_path}\" add .",
-            "\"{$git_path}\" commit -m \"Auto-sync: " . date('Y-m-d H:i:s') . "\"",
-            "\"{$git_path}\" push origin main"
-        ];
-
+        $git = $this->settings->info('git_path') ?: 'git';
         $results = [];
-        foreach($commands as $cmd){
-            exec($cmd . " 2>&1", $cmd_out, $cmd_ret);
-            $results[] = [
-                'command' => $cmd,
-                'output' => implode("\n", $cmd_out),
-                'return' => $cmd_ret
-            ];
-            unset($cmd_out);
+        $add = $this->run_command([$git, 'add', '.']);
+        $results[] = $add;
+        if ($add['return'] !== 0) return $this->failed($results);
+        $diff = $this->run_command([$git, 'diff', '--cached', '--quiet']);
+        if ($diff['return'] === 1) {
+            $commit = $this->run_command([$git, 'commit', '-m', 'Auto-sync: ' . date('Y-m-d H:i:s')]);
+            $results[] = $commit;
+            if ($commit['return'] !== 0) return $this->failed($results);
+        } elseif ($diff['return'] !== 0) {
+            $results[] = $diff;
+            return $this->failed($results);
         }
-
+        $push = $this->run_command([$git, 'push', 'origin', 'main']);
+        $results[] = $push;
+        if ($push['return'] !== 0) return $this->failed($results);
         return json_encode(['status' => 'success', 'msg' => 'Push complete.', 'details' => $results]);
     }
 
-    /**
-     * Pull updates from GitHub (Code and .sql file)
-     */
-    public function pull_updates(){
-        $git_path = $this->settings->info('git_path') ?: 'git';
-        $repo_path = base_app;
-
-        chdir($repo_path);
-        $cmd = "\"{$git_path}\" pull origin main 2>&1";
-        exec($cmd, $output, $return_var);
-
-        return json_encode([
-            'status' => ($return_var === 0) ? 'success' : 'failed',
-            'msg' => implode("\n", $output),
-            'return' => $return_var
-        ]);
+    private function failed($results) {
+        return json_encode(['status' => 'failed', 'msg' => 'Git sync failed.', 'details' => $results]);
     }
 
-    /**
-     * Restore database from database/sms_db.sql
-     */
-    public function restore_db(){
-        $mysql_bin = $this->settings->info('mysql_bin') ?: 'C:\xampp\mysql\bin\\';
-        $db_name = DB_NAME;
-        $db_user = DB_USERNAME;
-        $db_pass = DB_PASSWORD;
+    public function pull_updates() {
+        $git = $this->settings->info('git_path') ?: 'git';
+        $result = $this->run_command([$git, 'pull', '--ff-only', 'origin', 'main']);
+        return json_encode(['status' => $result['return'] === 0 ? 'success' : 'failed',
+            'msg' => $result['output'], 'return' => $result['return']]);
+    }
+
+    public function restore_db() {
         $sql_file = base_app . 'database/sms_db.sql';
-
-        if(!is_file($sql_file)){
-            return json_encode(['status' => 'failed', 'msg' => 'Backup file not found in database/ folder.']);
-        }
-
-        $restore_cmd = "\"{$mysql_bin}mysql\" -u {$db_user} " . (!empty($db_pass) ? "-p{$db_pass} " : "") . "{$db_name} < \"{$sql_file}\"";
-        exec($restore_cmd, $output, $return_var);
-
-        if($return_var !== 0){
-            return json_encode(['status' => 'failed', 'msg' => 'Database restoration failed. Check MySQL Bin path.', 'output' => implode("\n", $output)]);
-        }
-
-        return json_encode(['status' => 'success', 'msg' => 'Database successfully restored from GitHub backup.']);
+        if (!is_file($sql_file)) return json_encode(['status' => 'failed', 'msg' => 'Backup file not found.']);
+        $result = $this->run_command($this->mysql_arguments('mysql'), $sql_file, null, ['MYSQL_PWD' => DB_PASSWORD]);
+        return json_encode(['status' => $result['return'] === 0 ? 'success' : 'failed',
+            'msg' => $result['return'] === 0 ? 'Database restored. Run database/migrate.php before using the app.' : 'Database restoration failed.']);
     }
 }
 
-// Handler for AJAX requests
-$action = !isset($_GET['f']) ? 'none' : strtolower($_GET['f']);
-$git_sync = new GitSync();
-switch ($action) {
-	case 'push':
-		echo $git_sync->push_to_git();
-		break;
-	case 'pull':
-		echo $git_sync->pull_updates();
-		break;
-	case 'restore':
-		echo $git_sync->restore_db();
-		break;
-	default:
-		break;
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    $git_sync = new GitSync();
+    switch ($_GET['f'] ?? '') {
+        case 'push': echo $git_sync->push_to_git(); break;
+        case 'pull': echo $git_sync->pull_updates(); break;
+        case 'restore': echo $git_sync->restore_db(); break;
+        default: deny_request(400, 'Unknown Git sync action.');
+    }
 }

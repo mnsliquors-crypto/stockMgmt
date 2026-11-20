@@ -105,7 +105,7 @@ if($type === 'account' && $id){
 <script>
 $(function(){
     function openEdit(id){
-        uni_modal('Edit Opening Entry','transactions/opening_balances/manage.php?id='+id+'&category='+<?php echo json_encode($type) ?>,'mid-large');
+        uni_modal('Edit Opening Entry','modules/transactions/opening_balances/manage.php?id='+id+'&category='+<?php echo json_encode($type) ?>,'mid-large');
     }
     $('.edit-entry').click(function(){
         var id = $(this).data('id');

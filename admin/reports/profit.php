@@ -15,7 +15,7 @@ $sales_qry = $conn->query("
 ");
 $sales_rows=[];
 while($r=$sales_qry->fetch_assoc()){
-    $cogs = $conn->query("SELECT COALESCE(SUM(quantity*cost),0) as c FROM (SELECT ti.quantity, (SELECT cost FROM item_list WHERE id = ti.item_id) as cost FROM transaction_items ti WHERE ti.transaction_id = '{$r['id']}') as items")->fetch_assoc()['c'] ?? 0;
+    $cogs = $conn->query("SELECT COALESCE(SUM(ti.quantity * CASE WHEN ti.cost_recorded = 1 THEN ti.cost_price ELSE i.cost END), 0) AS c FROM transaction_items ti JOIN item_list i ON i.id = ti.item_id WHERE ti.transaction_id = '{$r['id']}'")->fetch_assoc()['c'] ?? 0;
     $r['cogs']=$cogs;
     $t_sales += $r['amount'];
     $t_cogs  += $cogs;

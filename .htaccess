@@ -1,0 +1,8 @@
+<FilesMatch "^(config\.php|initialize\.php|composer\.(json|lock)|router\.php)$|\.(sql|log|cache)$">
+    Require all denied
+</FilesMatch>
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule (^|/)\. - [F,L]
+    RewriteRule ^(database|temp|tests)(/|$) - [F,L]
+</IfModule>

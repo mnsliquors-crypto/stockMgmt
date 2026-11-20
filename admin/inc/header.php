@@ -4,6 +4,7 @@
 ?>
 <head>
     <meta charset="utf-8">
+    <meta name="csrf-token" content="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   	<title><?php echo $_settings->info('title') != false ? $_settings->info('title').' | ' : '' ?><?php echo $_settings->info('name') ?></title>
     <link rel="icon" href="<?php echo validate_image($_settings->info('logo')) ?>" />

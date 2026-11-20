@@ -26,7 +26,7 @@ try {
         $query = "SELECT i.date_created, i.name, i.description, s.display_name as vendor, i.cost, 
                          CASE WHEN i.status=1 THEN 'Active' ELSE 'Inactive' END as status 
                   FROM item_list i 
-                  INNER JOIN entity_list s ON i.vendor_id = s.id 
+                  LEFT JOIN entity_list s ON i.vendor_id = s.id
                   ORDER BY i.name ASC";
         $result = $db->conn->query($query);
         while($row = $result->fetch_assoc()) {

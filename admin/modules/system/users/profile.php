@@ -1,6 +1,6 @@
 <?php 
-$user = $conn->query("SELECT * FROM entity_list where id ='".$_settings->userdata('id')."' AND entity_type = 'User'");
-foreach($user->fetch_array() as $k =>$v){
+$user = $db->queryPrepared('SELECT * FROM users WHERE id = ?', 'i', [(int)$_settings->userdata('id')]);
+foreach(($user->fetch_assoc() ?: []) as $k =>$v){
 	$meta[$k] = $v;
 }
 ?>
@@ -17,15 +17,15 @@ foreach($user->fetch_array() as $k =>$v){
 				<input type="hidden" name="id" value="<?php echo $_settings->userdata('id') ?>">
 				<div class="form-group">
 					<label for="name">First Name</label>
-					<input type="text" name="firstname" id="firstname" class="form-control" value="<?php echo isset($meta['firstname']) ? $meta['firstname']: '' ?>" required>
+					<input type="text" name="firstname" id="firstname" class="form-control" value="<?php echo htmlspecialchars($meta['firstname'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
 				</div>
 				<div class="form-group">
 					<label for="name">Last Name</label>
-					<input type="text" name="lastname" id="lastname" class="form-control" value="<?php echo isset($meta['lastname']) ? $meta['lastname']: '' ?>" required>
+					<input type="text" name="lastname" id="lastname" class="form-control" value="<?php echo htmlspecialchars($meta['lastname'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
 				</div>
 				<div class="form-group">
 					<label for="username">Username</label>
-					<input type="text" name="username" id="username" class="form-control" value="<?php echo isset($meta['username']) ? $meta['username']: '' ?>" required  autocomplete="off">
+					<input type="text" name="username" id="username" class="form-control" value="<?php echo htmlspecialchars($meta['username'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required  autocomplete="off">
 				</div>
 				<div class="form-group">
 					<label for="password">Password</label>

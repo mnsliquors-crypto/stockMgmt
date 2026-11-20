@@ -1,14 +1,7 @@
 <?php
 require_once('../../config.php');
 
-// Restrict access
-/*
-if (!isset($_SESSION['login_id'])) {
-    header('Content-Type: application/json');
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
-}
-*/
+// Access is checked by the shared config bootstrap.
 
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 $from   = isset($_GET['from']) ? $_GET['from'] : date('Y-m-01');

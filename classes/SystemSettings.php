@@ -39,7 +39,7 @@ class SystemSettings extends DBConnection{
 		$upd = $this->conn->prepare("UPDATE system_info SET meta_value = ? WHERE meta_field = ?");
 		$ins = $this->conn->prepare("INSERT INTO system_info (meta_value,meta_field) VALUES (?,?)");
 		foreach ($_POST as $key => $value) {
-			if($key === "content") continue;
+			if($key === "content" || $key === '_csrf') continue;
 			if(isset($_SESSION['system_info'][$key])){
 				$value = str_replace("'", "&apos;", $value);
 				$upd->bind_param('ss', $value, $key);
@@ -53,7 +53,10 @@ class SystemSettings extends DBConnection{
 		$ins->close();
 		if(isset($_POST['content']))
 		foreach($_POST['content'] as $k => $v){
-			file_put_contents("../{$k}.html",$v);
+			if (!is_string($k) || !preg_match('/^[A-Za-z0-9_-]+$/', $k) || !is_string($v)) {
+                throw new InvalidArgumentException('Invalid content page.');
+            }
+			file_put_contents(base_app . "{$k}.html", $v);
 
 		}
 		
@@ -250,14 +253,15 @@ class SystemSettings extends DBConnection{
 }
 $_settings = new SystemSettings();
 $_settings->load_system_info();
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
 $action = !isset($_GET['f']) ? 'none' : strtolower($_GET['f']);
-$sysset = new SystemSettings();
 switch ($action) {
 	case 'update_settings':
-		echo $sysset->update_settings_info();
+		echo $_settings->update_settings_info();
 		break;
 	default:
-		// echo $sysset->index();
+		// No action requested.
 		break;
+}
 }
 ?>
