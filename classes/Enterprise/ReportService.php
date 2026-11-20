@@ -116,7 +116,7 @@ final class ReportService extends Service {
             if ($location) {$filter.=' AND v.location_id=?';$values[]=$location;}
             $rows=$this->rows('SELECT v.transaction_date AS Date,t.reference_code AS Document,i.name AS Item,l.name AS Location,v.movement AS Quantity
                 FROM erp_operational_lines v JOIN transactions t ON t.id=v.transaction_id JOIN item_list i ON i.id=v.item_id JOIN erp_locations l ON l.id=v.location_id
-                WHERE v.transaction_date<=?'.$filter.' ORDER BY v.transaction_date,v.line_id',$values);
+                WHERE v.transaction_date<=? AND v.movement<>0'.$filter.' ORDER BY v.transaction_date,v.line_id',$values);
             $values=[$to];$filter='';
             if ($item) {$filter.=' AND d.item_id=?';$values[]=$item;}
             if ($location) {$filter.=' AND (h.from_location_id=? OR h.to_location_id=?)';$values[]=$location;$values[]=$location;}
@@ -212,10 +212,11 @@ final class ReportService extends Service {
             $profitValues=[$from,$to];$profitFilter='';
             if($location){$profitFilter=' WHERE location_id=?';$profitValues[]=$location;}
             $expenseFilter='';if($location){$expenseFilter=' AND COALESCE(c.location_id,1)=?';$profitValues[]=$location;}
+            $expenseSql=CatalogService::available($this->db)?'SELECT transaction_date,SUM(amount) expenses FROM erp_operational_expenses'.($location?' WHERE location_id=?':'').' GROUP BY transaction_date':"SELECT t.transaction_date,SUM(t.total_amount) expenses FROM transactions t LEFT JOIN erp_transaction_context c ON c.transaction_id=t.id WHERE t.type='expense'".$expenseFilter.' GROUP BY t.transaction_date';
             $rows=$this->rows("SELECT d.day AS Date,COALESCE(l.revenue,0) AS Revenue,COALESCE(l.cogs,0) AS COGS,COALESCE(e.expenses,0) AS Expenses,COALESCE(l.revenue,0)-COALESCE(l.cogs,0)-COALESCE(e.expenses,0) AS Net_Profit
                 FROM (SELECT DISTINCT transaction_date AS day FROM transactions WHERE transaction_date BETWEEN ? AND ?) d
                 LEFT JOIN (SELECT transaction_date,SUM(revenue) revenue,SUM(cogs) cogs FROM erp_operational_lines".$profitFilter." GROUP BY transaction_date) l ON l.transaction_date=d.day
-                LEFT JOIN (SELECT t.transaction_date,SUM(t.total_amount) expenses FROM transactions t LEFT JOIN erp_transaction_context c ON c.transaction_id=t.id WHERE t.type='expense'".$expenseFilter." GROUP BY t.transaction_date) e ON e.transaction_date=d.day ORDER BY d.day",$profitValues);
+                LEFT JOIN (".$expenseSql.") e ON e.transaction_date=d.day ORDER BY d.day",$profitValues);
         } elseif ($kind==='promotions') {
             $rows=$this->rows("SELECT p.code AS Code,p.name AS Promotion,i.name AS Item,SUM(ti.quantity) AS Base_Units,SUM(d.promotion_saving) AS Savings,SUM(ti.total_price) AS Revenue FROM erp_line_details d JOIN transaction_items ti ON ti.id=d.line_id JOIN transactions t ON t.id=ti.transaction_id JOIN erp_promotions p ON p.id=d.promotion_id JOIN item_list i ON i.id=ti.item_id WHERE t.type='sale' AND t.transaction_date BETWEEN ? AND ? GROUP BY p.id,p.code,p.name,i.id,i.name ORDER BY Revenue DESC",[$from,$to]);
             $basis='Promotion snapshots captured at checkout; later promotion changes do not rewrite past sales.';

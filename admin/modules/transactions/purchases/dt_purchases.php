@@ -55,6 +55,7 @@ if(isset($columns[$columnIndex])) {
 // Fetch records
 $lockedSql = $conn->query("SHOW TABLES LIKE 'gl_journals'")->num_rows ? "EXISTS (SELECT 1 FROM gl_journals g WHERE g.source_transaction_id=p.id AND g.status='posted')" : '0';
 if ($conn->query("SHOW TABLES LIKE 'po_receipts'")->num_rows) $lockedSql .= ' OR EXISTS (SELECT 1 FROM po_receipts r WHERE r.transaction_id=p.id)';
+if (!empty($purchase_cycle_available)) $lockedSql .= ' OR EXISTS (SELECT 1 FROM po_vendor_bills b WHERE b.transaction_id=p.id)';
 $sql = "SELECT p.*, ($lockedSql) AS purchase_locked, s.display_name as vendor, COALESCE(pay.total_paid, 0) as total_paid, COALESCE(ret.total_returned, 0) - $credit_adjustment as total_returned
         FROM `transactions` p 
         INNER JOIN entity_list s ON p.entity_id = s.id AND s.entity_type = 'Supplier'

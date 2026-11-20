@@ -3,15 +3,15 @@ $as_of = isset($_GET['as_of']) ? $_GET['as_of'] : date("Y-m-d");
 
 $qry = $conn->query("
     SELECT i.id, i.name, c.name as category,
-           COALESCE((SELECT AVG(ti.unit_price) FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id=i.id AND t.type IN ('purchase', 'opening_stock') AND ti.unit_price>0 AND DATE(t.transaction_date)<='{$as_of}'), 0) as avg_cost,
+           COALESCE((SELECT AVG(ti.unit_price) FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id=i.id AND t.type IN ('purchase', 'item_receipt', 'opening_stock') AND ti.unit_price>0 AND DATE(t.transaction_date)<='{$as_of}'), 0) as avg_cost,
            COALESCE((SELECT SUM(CASE 
-                                WHEN t.type IN ('purchase', 'opening_stock', 'adjustment') THEN ti.quantity 
+                                WHEN t.type IN ('purchase', 'item_receipt', 'opening_stock', 'adjustment') THEN ti.quantity
                                 WHEN t.type = 'sale' THEN -ti.quantity 
                                 WHEN t.type = 'return' THEN (CASE WHEN EXISTS(SELECT 1 FROM entity_list WHERE id = t.entity_id AND entity_type = 'Supplier') THEN -ti.quantity ELSE ti.quantity END)
                                 ELSE 0 END) 
-                      FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id 
+                      FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id
                       WHERE ti.item_id=i.id AND DATE(t.transaction_date)<='{$as_of}'), 0) as qty_on_hand
-    FROM item_list i
+    FROM {$stock_item_source} i
     LEFT JOIN category_list c ON i.category_id=c.id
     WHERE i.status=1
     ORDER BY i.name ASC

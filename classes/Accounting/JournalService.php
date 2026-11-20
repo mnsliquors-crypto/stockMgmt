@@ -166,32 +166,66 @@ final class JournalService {
     private function movement(array &$lines, int $account, string $amount, bool $debit, string $description = ''): void {
         if (Money::compare($amount,'0') === 0) return;
         if (Money::compare($amount,'0') < 0) { $amount = Money::subtract('0',$amount); $debit = !$debit; }
+        foreach($lines as &$line)if((int)$line['account_id']===$account&&$line['description']===$description&&($debit?Money::compare($line['debit'],'0')>0:Money::compare($line['credit'],'0')>0)){
+            $field=$debit?'debit':'credit';$line[$field]=Money::add($line[$field],$amount);return;
+        }unset($line);
         $lines[] = ['account_id'=>$account,'debit'=>$debit?$amount:'0.00','credit'=>$debit?'0.00':$amount,'description'=>$description];
+    }
+    private function itemStock(array $item): bool {return in_array($item['catalog_type']??'inventory',['inventory','assembly'],true);}
+    private function itemAccount(array $item,string $field,string $fallback): int {return !empty($item[$field])?(int)$item[$field]:$this->systemAccount($fallback);}
+    private function itemValues(array &$lines,array $items,string $amount,bool $debit,bool $revenue=false): void {
+        $sum='0.00';foreach($items as $item)$sum=Money::add($sum,$item['total_price']);
+        if(Money::compare($sum,'0')===0){if(Money::compare($amount,'0')===0)return;throw new \RuntimeException('Item values do not match the document.');}
+        $cumulative='0.00';$allocated='0.00';
+        foreach($items as $item){
+            $cumulative=Money::add($cumulative,$item['total_price']);$value=Money::decimal(bcdiv(bcmul($amount,$cumulative,12),$sum,12));
+            $part=Money::subtract($value,$allocated);$allocated=$value;
+            $field=$revenue?'income_account_id':($this->itemStock($item)?'inventory_account_id':'expense_account_id');
+            $fallback=$revenue?'sales':($this->itemStock($item)?'inventory':'expenses');
+            $this->movement($lines,$this->itemAccount($item,$field,$fallback),$part,$debit);
+        }
     }
     private function sourceLines(array $source): array {
         $id = (int)$source['id']; $type = $source['type'];
         $amount = Money::decimal($source['total_amount']); $tax = Money::decimal($source['tax']);
         if (Money::compare($tax,'0')<0 || (in_array($type,['sale','purchase','payment','return','expense'],true) && Money::compare($amount,'0')<0)) throw new \RuntimeException('Document and tax amounts must be nonnegative.');
         $total = Money::add($amount,$tax); $lines = [];
-        $items = $this->rows('SELECT * FROM transaction_items WHERE transaction_id=? ORDER BY id FOR UPDATE', [$id]);
+        $catalog=$this->db->query("SHOW TABLES LIKE 'erp_line_catalog'")->num_rows>0;
+        $items = $this->rows($catalog?'SELECT i.*,COALESCE(c.item_type,p.item_type) AS catalog_type,c.inventory_account_id,c.income_account_id,c.expense_account_id FROM transaction_items i JOIN item_list p ON p.id=i.item_id LEFT JOIN erp_line_catalog c ON c.line_id=i.id WHERE i.transaction_id=? ORDER BY i.id FOR UPDATE':'SELECT * FROM transaction_items WHERE transaction_id=? ORDER BY id FOR UPDATE', [$id]);
         $opening = str_starts_with((string)$source['remarks'], 'Opening Balance');
         if ($type === 'sale') {
             $this->movement($lines,$this->systemAccount('receivables'),$total,true);
-            $this->movement($lines,$this->systemAccount($opening?'opening_equity':'sales'),$amount,false);
+            if($opening)$this->movement($lines,$this->systemAccount('opening_equity'),$amount,false);
+            else $this->itemValues($lines,$items,$amount,false,true);
             $this->movement($lines,$this->systemAccount('output_tax'),$tax,false);
             if (!$opening) {
                 if (!$items) throw new \RuntimeException('This sale has no item lines.');
                 $cost = '0.00';
                 foreach ($items as $item) {
+                    if(!$this->itemStock($item))continue;
                     if (!(int)$item['cost_recorded']) throw new \RuntimeException('Historical sale cost is missing. Reconcile its original costs before posting.');
                     $cost = Money::add($cost,Money::multiply($item['quantity'],$item['cost_price']));
+                    $this->movement($lines,$this->itemAccount($item,'expense_account_id','cogs'),Money::multiply($item['quantity'],$item['cost_price']),true);
+                    $this->movement($lines,$this->itemAccount($item,'inventory_account_id','inventory'),Money::multiply($item['quantity'],$item['cost_price']),false);
                 }
-                $this->movement($lines,$this->systemAccount('cogs'),$cost,true);
-                $this->movement($lines,$this->systemAccount('inventory'),$cost,false);
             }
+        } elseif ($type === 'item_receipt') {
+            $receipt=$this->row('SELECT r.* FROM po_item_receipts r JOIN po_item_receipt_seals s ON s.receipt_id=r.id WHERE r.transaction_id=?',[$id]);
+            if(!$receipt||!$items||Money::compare($tax,'0')!==0)throw new \RuntimeException('Item receipt is incomplete or contains invoice tax.');
+            $value='0.00';foreach($items as $item)$value=Money::add($value,$item['total_price']);
+            if(Money::compare($value,$amount)!==0)throw new \RuntimeException('Receipt inventory value does not match its document.');
+            if($receipt['reversal_of']&&!$this->row("SELECT j.id FROM po_item_receipts r JOIN gl_journals j ON j.source_transaction_id=r.transaction_id AND j.status='posted' WHERE r.id=?",[$receipt['reversal_of']]))throw new \RuntimeException('Post the original item receipt before its reversal.');
+            $this->itemValues($lines,$items,$amount,true);
+            $this->movement($lines,$this->systemAccount('grir'),$amount,false);
         } elseif ($type === 'purchase') {
-            if (!$items && !$opening) throw new \RuntimeException('This purchase has no item lines.');
-            $this->movement($lines,$this->systemAccount($opening?'opening_equity':'inventory'),$amount,true);
+            $bill=$this->db->query("SHOW TABLES LIKE 'po_vendor_bills'")->num_rows?$this->row("SELECT id FROM po_vendor_bills WHERE transaction_id=? AND status='recorded'",[$id]):null;
+            if($bill){
+                $totalLines=$this->row('SELECT COALESCE(SUM(line_total),0) AS amount FROM po_vendor_bill_lines WHERE bill_id=?',[$bill['id']]);
+                if($items||Money::compare($totalLines['amount'],$amount)!==0)throw new \RuntimeException('Supplier bill allocation does not match its document.');
+                if($this->row("SELECT r.id FROM po_vendor_bill_lines l JOIN po_item_receipt_lines i ON i.id=l.receipt_line_id JOIN po_item_receipts r ON r.id=i.receipt_id LEFT JOIN gl_journals j ON j.source_transaction_id=r.transaction_id AND j.status='posted' WHERE l.bill_id=? AND j.id IS NULL LIMIT 1",[$bill['id']]))throw new \RuntimeException('Post all linked item receipts before posting this supplier bill.');
+            } elseif (!$items && !$opening) throw new \RuntimeException('This purchase has no item lines.');
+            if($bill||$opening)$this->movement($lines,$this->systemAccount($bill?'grir':'opening_equity'),$amount,true);
+            else $this->itemValues($lines,$items,$amount,true);
             $this->movement($lines,$this->systemAccount('input_tax'),$tax,true);
             $this->movement($lines,$this->systemAccount('payables'),$total,false);
         } elseif ($type === 'payment' || $type === 'transfer' || $type === 'opening_balance' || $type === 'expense') {
@@ -219,7 +253,7 @@ final class JournalService {
             if (!$items) throw new \RuntimeException('This stock document has no item lines.');
             $value = '0.00';
             foreach ($items as $item) $value=Money::add($value,Money::multiply($item['quantity'],$item['unit_price']));
-            $this->movement($lines,$this->systemAccount('inventory'),$value,true);
+            $this->itemValues($lines,$items,$value,true);
             $this->movement($lines,$this->systemAccount($type==='opening_stock'?'opening_equity':'inventory_adjustments'),$value,false);
         } elseif ($type === 'return') {
             if (!$items) throw new \RuntimeException('This return has no item lines.');
@@ -231,23 +265,28 @@ final class JournalService {
             if ($vendor !== in_array(strtolower((string)$source['entity_type']),['vendor','supplier'],true)) throw new \RuntimeException('Return party type does not match its source document.');
             if (Money::compare($parent['tax'],'0')>0 && Money::compare($tax,'0')===0) throw new \RuntimeException('A taxed return needs its tax credit recorded before posting.');
             $cost = '0.00';
-            foreach ($items as $item) {
+            foreach ($items as &$item) {
                 $original = $this->row('SELECT SUM(quantity) AS quantity,MIN(cost_recorded) AS cost_recorded, SUM(quantity*cost_price)/NULLIF(SUM(quantity),0) AS cost_price FROM transaction_items WHERE transaction_id=? AND item_id=?', [$parent['id'],$item['item_id']]);
+                if($catalog){$classification=$this->row('SELECT c.item_type AS catalog_type,c.inventory_account_id,c.income_account_id,c.expense_account_id FROM erp_line_catalog c JOIN transaction_items i ON i.id=c.line_id WHERE i.transaction_id=? AND i.item_id=? ORDER BY i.id LIMIT 1',[$parent['id'],$item['item_id']]);if($classification)$item=array_merge($item,$classification);}
                 $returned = $this->row("SELECT COALESCE(SUM(i.quantity),0) AS quantity FROM transaction_items i JOIN transactions t ON t.id=i.transaction_id WHERE t.type='return' AND t.parent_id=? AND i.item_id=?", [$parent['id'],$item['item_id']]);
                 if (!$original['quantity'] || bccomp($returned['quantity'],$original['quantity'],4)>0 || bccomp($item['quantity'],'0',4)<=0) throw new \RuntimeException('Returned quantity exceeds the original invoice.');
-                if (!$vendor) {
+                if (!$vendor&&$this->itemStock($item)) {
                     if (!(int)$original['cost_recorded']) throw new \RuntimeException('Original sale cost is missing.');
                     $cost = Money::add($cost,Money::multiply($item['quantity'],$original['cost_price']));
+                    $this->movement($lines,$this->itemAccount($item,'inventory_account_id','inventory'),Money::multiply($item['quantity'],$original['cost_price']),true);
+                    $this->movement($lines,$this->itemAccount($item,'expense_account_id','cogs'),Money::multiply($item['quantity'],$original['cost_price']),false);
                 }
-            }
+            }unset($item);
             $this->movement($lines,$this->systemAccount($vendor?'payables':'sales_returns'),$vendor?$total:$amount,true);
-            $this->movement($lines,$this->systemAccount($vendor?'inventory':'receivables'),$vendor?$amount:$total,false);
+            if($vendor)$this->itemValues($lines,$items,$amount,false);
+            else $this->movement($lines,$this->systemAccount('receivables'),$total,false);
             $this->movement($lines,$this->systemAccount($vendor?'input_tax':'output_tax'),$tax,!$vendor);
-            if (!$vendor) {
-                $this->movement($lines,$this->systemAccount('inventory'),$cost,true);
-                $this->movement($lines,$this->systemAccount('cogs'),$cost,false);
-            }
         } else throw new \RuntimeException('This document type is not supported for accounting posting.');
+        require_once __DIR__.'/../Enterprise/CatalogService.php';
+        if(\App\Enterprise\CatalogService::available($this->db)){
+            $purchase=\App\Enterprise\CatalogService::transactionPurchase($this->db,$id);
+            if($purchase!==null)foreach($lines as $line)\App\Enterprise\CatalogService::assertRecordUsage($this->db,'account',(int)$line['account_id'],$purchase);
+        }
         return $lines;
     }
 

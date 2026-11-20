@@ -32,4 +32,8 @@ require_once __DIR__ . '/migrations/002_procurement.php';
 migrate_procurement($db->conn);
 require_once __DIR__ . '/migrations/003_v3_update.php';
 migrate_v3_update($db->conn);
+require_once __DIR__.'/migrations/004_purchase_cycle.php';
+migrate_purchase_cycle($db->conn);
+require_once __DIR__.'/migrations/005_item_masters.php';
+migrate_item_masters($db->conn);
 echo "Schema is up to date.\n";

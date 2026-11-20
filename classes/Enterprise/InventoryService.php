@@ -1,10 +1,11 @@
 <?php
 namespace App\Enterprise;
 require_once __DIR__ . '/Service.php';
+require_once __DIR__ . '/CatalogService.php';
 use App\Accounting\Money;
 
 final class InventoryService extends Service {
-    public const MOVEMENT = "CASE WHEN t.type IN ('purchase','opening_stock','adjustment') THEN ti.quantity
+    public const MOVEMENT = "CASE WHEN t.type IN ('purchase','item_receipt','opening_stock','adjustment') THEN ti.quantity
         WHEN t.type='sale' THEN -ti.quantity WHEN t.type='return' THEN
         IF(LOWER(t.entity_type) IN ('vendor','supplier'),-ti.quantity,ti.quantity) ELSE 0 END";
 
@@ -38,6 +39,7 @@ final class InventoryService extends Service {
     }
 
     public function stock(?int $location = null, ?int $item = null, ?string $asOf = null): array {
+        $source=CatalogService::stockSource($this->db);
         $values = []; $filter = '';
         if ($location !== null) { $filter .= ' AND COALESCE(c.location_id,1)=?'; $values[] = $location; }
         if ($asOf !== null) { $filter .= ' AND t.transaction_date<=?'; $values[] = $this->date($asOf); }
@@ -54,9 +56,11 @@ final class InventoryService extends Service {
         $sql = 'SELECT i.id,i.name,i.unit,i.cost,i.selling_price,i.mrp,i.reorder_level,i.vendor_id,i.status,
             COALESCE(m.quantity,0)' . $join . ' AS quantity
             FROM item_list i LEFT JOIN (SELECT ti.item_id,SUM(' . self::MOVEMENT . ') AS quantity
-                FROM transaction_items ti JOIN transactions t ON t.id=ti.transaction_id
+                FROM '.$source.' ti JOIN transactions t ON t.id=ti.transaction_id
                 LEFT JOIN erp_transaction_context c ON c.transaction_id=t.id WHERE 1=1' . $filter . ' GROUP BY ti.item_id) m ON m.item_id=i.id' . $transfers;
-        if ($item !== null) { $sql .= ' WHERE i.id=?'; $values[] = $item; }
+        $sql.=' WHERE 1=1';
+        if(CatalogService::available($this->db))$sql.=" AND i.item_type IN ('inventory','assembly') AND i.is_matrix_parent=0";
+        if ($item !== null) { $sql .= ' AND i.id=?'; $values[] = $item; }
         return $this->rows($sql . ' ORDER BY i.name', $values);
     }
 
@@ -65,6 +69,7 @@ final class InventoryService extends Service {
         $old = $query('SELECT location_id FROM erp_transaction_context WHERE transaction_id=?', [$transaction])->fetch_assoc();
         $location = $requested === null || $requested === '' ? (int)($old['location_id'] ?? 1) : filter_var($requested, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
         if (!$location || !$query('SELECT id FROM erp_locations WHERE id=? AND active=1', [$location])->num_rows) throw new \InvalidArgumentException('Choose an active location.');
+        if(CatalogService::available($db)){$purchase=CatalogService::transactionPurchase($db,$transaction);if($purchase!==null)CatalogService::assertRecordUsage($db,'location',(int)$location,$purchase);}
         if ($old && (int)$old['location_id'] === $location) return $location;
         if ($query("SELECT id FROM gl_journals WHERE source_transaction_id=? AND status='posted'", [$transaction])->num_rows) throw new \RuntimeException('The location of a posted document cannot be changed.');
         if ($location !== 1 || $old) $query('INSERT INTO erp_transaction_context(transaction_id,location_id) VALUES (?,?) ON DUPLICATE KEY UPDATE location_id=VALUES(location_id)', [$transaction,$location]);
@@ -138,6 +143,7 @@ final class InventoryService extends Service {
         foreach ($raw as $line) {
             if (!is_array($line)) throw new \InvalidArgumentException('Invalid transfer line.');
             $item=$this->id($line['item_id']??'');
+            if(!CatalogService::tracked($this->db,$item))throw new \InvalidArgumentException('Stock transfers require an inventory or assembly variant.');
             if (isset($lines[$item])) throw new \InvalidArgumentException('Duplicate item in transfer.');
             $quantity=$this->decimal($line['quantity']??'',4,true);
             $unit=$this->unit($item, $this->text($line['unit_code']??'base',10));

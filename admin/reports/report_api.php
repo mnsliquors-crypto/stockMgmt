@@ -166,7 +166,7 @@ switch ($action) {
             $payable    = $get("SELECT COALESCE(SUM(t.total_amount - (SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return'))), 0) FROM transactions t WHERE t.type = 'purchase'");
 
             // Low Stock
-            $low_stock_count = $get("SELECT COUNT(*) FROM (SELECT i.id, COALESCE((SELECT SUM(CASE WHEN t.type IN ('purchase', 'opening_stock', 'adjustment') THEN ti.quantity WHEN t.type = 'sale' THEN -ti.quantity WHEN t.type = 'return' THEN (CASE WHEN EXISTS(SELECT 1 FROM entity_list WHERE id = t.entity_id AND entity_type = 'Supplier') THEN -ti.quantity ELSE ti.quantity END) ELSE 0 END) FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id=i.id),0) as available FROM item_list i WHERE i.status=1 HAVING available < 10) as t");
+            $low_stock_count = $get("SELECT COUNT(*) FROM (SELECT i.id, COALESCE((SELECT SUM(CASE WHEN t.type IN ('purchase', 'item_receipt', 'opening_stock', 'adjustment') THEN ti.quantity WHEN t.type = 'sale' THEN -ti.quantity WHEN t.type = 'return' THEN (CASE WHEN EXISTS(SELECT 1 FROM entity_list WHERE id = t.entity_id AND entity_type = 'Supplier') THEN -ti.quantity ELSE ti.quantity END) ELSE 0 END) FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id=i.id),0) as available FROM {$stock_item_source} i WHERE i.status=1 HAVING available < 10) as t");
 
             // Today's POS Sales
             $td_pos_sales = $get("SELECT COALESCE(SUM(total_amount), 0) FROM transactions WHERE type='sale' AND DATE(transaction_date) = '{$today}' AND remarks LIKE '%[POS]%'");
@@ -289,19 +289,19 @@ switch ($action) {
             fputcsv($out,['#','Item','Category','Purchase Qty','Sales Qty','Current Stock','Avg Cost','Selling Price','Stock Value']);
             $i=1;
             $qry=$conn->query("SELECT i.name, c.name as cat,
-                  (SELECT COALESCE(SUM(ti.quantity), 0) FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id = i.id AND t.type = 'purchase') as pur_qty,
-                  (SELECT COALESCE(SUM(ti.quantity), 0) FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id = i.id AND t.type = 'sale') as sal_qty,
+                  (SELECT COALESCE(SUM(ti.quantity), 0) FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id = i.id AND t.type IN ('purchase','item_receipt')) as pur_qty,
+                  (SELECT COALESCE(SUM(ti.quantity), 0) FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id = i.id AND t.type = 'sale') as sal_qty,
                   (SELECT COALESCE(SUM(CASE 
-                                    WHEN t.type IN ('purchase', 'opening_stock') THEN ti.quantity 
+                                    WHEN t.type IN ('purchase', 'item_receipt', 'opening_stock') THEN ti.quantity
                                     WHEN t.type = 'sale' THEN -ti.quantity 
                                     WHEN t.type = 'adjustment' THEN ti.quantity 
                                     WHEN t.type = 'return' THEN (CASE WHEN t.entity_id IN (SELECT id FROM entity_list WHERE entity_type='Supplier') THEN -ti.quantity ELSE ti.quantity END)
                                     ELSE 0 END), 0) 
-                   FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id 
+                   FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id
                    WHERE ti.item_id = i.id) as cur_stock,
-                  (SELECT COALESCE(AVG(ti.unit_price), 0) FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id = i.id AND t.type = 'purchase' AND ti.unit_price > 0) as avg_cost,
-                  i.price as sell_price
-                  FROM item_list i LEFT JOIN category_list c ON i.category_id=c.id WHERE i.status=1 ORDER BY i.name");
+                  (SELECT COALESCE(AVG(ti.unit_price), 0) FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id = i.id AND t.type IN ('purchase','item_receipt') AND ti.unit_price > 0) as avg_cost,
+                  i.selling_price as sell_price
+                  FROM {$stock_item_source} i LEFT JOIN category_list c ON i.category_id=c.id WHERE i.status=1 ORDER BY i.name");
             while($r=$qry->fetch_assoc()){
                 $val = $r['cur_stock'] * $r['avg_cost'];
                 fputcsv($out,[$i++,$r['name'],$r['cat']??'N/A',number_format($r['pur_qty'],2),number_format($r['sal_qty'],2),

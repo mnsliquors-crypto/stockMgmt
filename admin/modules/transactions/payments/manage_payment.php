@@ -3,6 +3,7 @@ if(!isset($conn) || !$conn){
     require_once __DIR__ . '/../../../../config.php';
 }
 $id = $_GET['id'] ?? null;
+if($id&&!empty($purchase_cycle_available)&&$db->queryPrepared('SELECT transaction_id FROM po_cycle_payments WHERE transaction_id=?','i',[(int)$id])->num_rows){echo '<div class="alert alert-info">Recorded supplier payments are immutable.</div>';return;}
 $account_amounts = [];
 $existing_allocations = [];
 if($id){

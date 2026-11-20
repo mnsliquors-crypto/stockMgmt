@@ -9,11 +9,11 @@ if(!$low_stock_data){
     $low_stock_qry = $conn->query("
         SELECT i.name,
          COALESCE((SELECT SUM(CASE 
-                    WHEN t.type IN ('purchase', 'opening_stock', 'adjustment') THEN ti.quantity 
+                    WHEN t.type IN ('purchase', 'item_receipt', 'opening_stock', 'adjustment') THEN ti.quantity
                     WHEN t.type = 'sale' THEN -ti.quantity 
                     WHEN t.type = 'return' THEN (CASE WHEN EXISTS(SELECT 1 FROM entity_list WHERE id = t.entity_id AND entity_type = 'Supplier') THEN -ti.quantity ELSE ti.quantity END)
-                    ELSE 0 END) FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id=i.id),0) as available
-        FROM item_list i WHERE i.status=1
+                    ELSE 0 END) FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id=i.id),0) as available
+        FROM {$stock_item_source} i WHERE i.status=1
         HAVING available < 10
         ORDER BY available ASC
         LIMIT 8
@@ -22,7 +22,7 @@ if(!$low_stock_data){
     while($lsr = $low_stock_qry->fetch_assoc()) $low_stock_list[] = $lsr;
 
     function kpi($conn, $sql) { return floatval($conn->query($sql)->fetch_array()[0] ?? 0); }
-    $low_stock_count = kpi($conn, "SELECT COUNT(*) FROM (SELECT i.id, COALESCE((SELECT SUM(CASE WHEN t.type IN ('purchase', 'opening_stock', 'adjustment') THEN ti.quantity WHEN t.type = 'sale' THEN -ti.quantity WHEN t.type = 'return' THEN (CASE WHEN EXISTS(SELECT 1 FROM entity_list WHERE id = t.entity_id AND entity_type = 'Supplier') THEN -ti.quantity ELSE ti.quantity END) ELSE 0 END) FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id=i.id),0) as available FROM item_list i WHERE i.status=1 HAVING available < 10) as t");
+    $low_stock_count = kpi($conn, "SELECT COUNT(*) FROM (SELECT i.id, COALESCE((SELECT SUM(CASE WHEN t.type IN ('purchase', 'item_receipt', 'opening_stock', 'adjustment') THEN ti.quantity WHEN t.type = 'sale' THEN -ti.quantity WHEN t.type = 'return' THEN (CASE WHEN EXISTS(SELECT 1 FROM entity_list WHERE id = t.entity_id AND entity_type = 'Supplier') THEN -ti.quantity ELSE ti.quantity END) ELSE 0 END) FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id WHERE ti.item_id=i.id),0) as available FROM {$stock_item_source} i WHERE i.status=1 HAVING available < 10) as t");
 
     $low_stock_data = ['list' => $low_stock_list, 'count' => $low_stock_count];
     $cache->set('dashboard_low_stock', $low_stock_data);

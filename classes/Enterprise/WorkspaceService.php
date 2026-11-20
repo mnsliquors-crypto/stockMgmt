@@ -116,7 +116,7 @@ final class WorkspaceService extends Service {
     public function health(): array {
         $this->admin();
         $unbalanced=(int)$this->row("SELECT COUNT(*) AS count FROM (SELECT j.id FROM gl_journals j LEFT JOIN gl_journal_lines l ON l.journal_id=j.id WHERE j.status='posted' GROUP BY j.id HAVING COUNT(l.id)<2 OR COALESCE(SUM(l.debit-l.credit),0)<>0) x")['count'];
-        $pending=(int)$this->row("SELECT COUNT(*) AS count FROM transactions t WHERE t.type IN ('sale','purchase','return','payment','expense','adjustment','opening_stock','opening_balance','transfer') AND NOT EXISTS (SELECT 1 FROM gl_journals j WHERE j.source_transaction_id=t.id AND j.status='posted')")['count'];
+        $pending=(int)$this->row("SELECT COUNT(*) AS count FROM transactions t WHERE t.type IN ('sale','purchase','item_receipt','return','payment','expense','adjustment','opening_stock','opening_balance','transfer') AND NOT EXISTS (SELECT 1 FROM gl_journals j WHERE j.source_transaction_id=t.id AND j.status='posted')")['count'];
         $missing=(int)$this->row("SELECT COUNT(DISTINCT t.id) AS count FROM transactions t JOIN transaction_items i ON i.transaction_id=t.id WHERE t.type='sale' AND i.cost_recorded=0")['count'];
         $negative=(int)$this->row('SELECT COUNT(*) AS count FROM item_list WHERE quantity<0')['count'];
         $orphans=(int)$this->row('SELECT COUNT(*) AS count FROM transaction_items i LEFT JOIN transactions t ON t.id=i.transaction_id LEFT JOIN item_list p ON p.id=i.item_id WHERE t.id IS NULL OR p.id IS NULL')['count'];

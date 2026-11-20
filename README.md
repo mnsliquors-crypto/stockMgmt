@@ -259,14 +259,52 @@ transaction CSV imports. Opening-balance setup remains a separate cutover
 operation. Policy changes require an administrator, a reason, and are audited.
 Use named administrator accounts for independent approvals, not a shared login.
 
-Receiving in this release combines goods receipt and supplier bill entry; it is
-not a separate uninvoiced-receipts/three-way-invoice-matching system. Bill payment
-and journal posting use the existing Payments and Accounting screens. Receipts
-update the existing aggregate stock ledger; after migration 003, they also retain
-the order's selected location and frozen case conversions. The current
-historical inward-weighted cost method is retained; FIFO, landed cost, and stock
-reservations have not been added. Legacy purchase bills do not participate in the
-new supplier-invoice uniqueness index.
+Migration 004 separates receiving from billing. **Purchase Orders -> Receive
+Items -> Supplier Bills -> Record Payment** is the current purchase workflow.
+Receipts retain the order's location and frozen case conversions. Earlier
+combined purchases remain readable and their API remains compatible. Direct
+purchase entry remains available unless mandatory purchase orders are enabled.
+The historical inward-weighted cost method is retained; FIFO, landed cost, and
+stock reservations have not been added.
+
+### Separate Purchase Cycle
+
+Run `php database/migrate.php` after backing up the database. This includes
+`004_purchase_cycle` and adds receipt/bill sidecars, accounting guards, and the
+Goods Received Not Invoiced account (`2150-GRIR`). Existing purchases are not
+converted, recreated, or automatically posted.
+
+1. Create and approve a purchase order under **Purchasing**.
+2. Enter a full or partial delivery with **Receive Items**. This increases stock
+   without creating an invoice, VAT claim, or supplier payable.
+3. On the receipt, use **Review & Post** to post its accounting entry, then
+   **New Bill**. Select received, unbilled quantities and the supplier invoice
+   number. Save the draft and use **Record Saved Bill** to make it immutable.
+4. Review and post the bill. Every linked receipt must already be posted.
+5. Record partial or full payments on the bill, selecting an active account.
+   Review and post each payment separately. Several payments may use different
+   accounts. Outstanding balances include applied supplier credits.
+
+The order displays ordered, received, outstanding, billed, and unbilled
+quantities. **Transactions -> Item Receipts / Supplier Bills** provides document
+lists and related-record links. Bills never create a second stock movement.
+Receipt, bill creation, recording, and payment requests are retry-safe; supplier
+invoice numbers are unique per supplier across the two PO receiving paths.
+Historical direct-entry bills without structured invoice numbers cannot be
+deduplicated automatically.
+
+An administrator can reverse an unbilled receipt, with a date and reason, when
+the stock remains available. Cancel any draft bills using it first. Receipt
+reversal reopens its PO quantity; post the original and reversal entries in
+Accounting. Recorded bills and payments are immutable. Purchase returns, bill
+credits, refunds, bill price variances, and the separate sales cycle are **not
+implemented by this phase**. Do not use the old combined supplier-return form
+against a separate supplier bill; that route is blocked to protect stock.
+
+Posting follows: receipt Dr Inventory / Cr GRIR; bill Dr GRIR and Input VAT /
+Cr Payables; payment Dr Payables / Cr Bank or Cash. Amounts use approved PO
+prices/tax and exact cumulative rounding, not invoice-price variance matching.
+This model follows [Oracle's receiving accounting explanation](https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_N2408991.html).
 
 ### Purchasing Verification
 
@@ -280,8 +318,10 @@ php tests/regression.php
 php tests/accounting_pos.php
 php tests/accounting_settlements.php
 php tests/procurement.php
+php tests/purchase_cycle.php
 APP_BASE_URL=http://127.0.0.1:8081/ php tests/http.php
 APP_BASE_URL=http://127.0.0.1:8081/ php tests/procurement_http.php
+APP_BASE_URL=http://127.0.0.1:8081/ php tests/purchase_cycle_http.php
 ```
 
 Procurement checks cover money/quantity precision, permissions, self-approval,
@@ -292,9 +332,15 @@ exercise the old purchase endpoint and CSV import under mandatory-PO policy.
 
 After those suites, `tests/browser_procurement.mjs` can use the installed Chrome
 debugging endpoint on port 9223. It creates an order, uses an independent checker,
-receives two deliveries as staff, rejects a duplicate invoice, and checks print,
+receives two deliveries as staff, and checks print,
 item controls, navigation, and desktop/mobile layout. Its browser users exist only
 in the disposable database. No additional packages are required.
+
+`tests/browser_purchase_cycle.mjs` exercises the separate receipt/bill/payment
+screens, accounting review/posting, partial and full settlement, print, and
+desktop/mobile layouts down to 320px. Run it after `procurement_http.php`, which
+creates its independent browser approver. It uses the same existing Chrome
+debugging endpoint and Node runtime, without installing packages.
 
 ## V3 Update
 
@@ -313,3 +359,69 @@ See [the V3 Update notes and remaining work](docs/V3_UPDATE.md) for test
 commands, exact adaptations, and deliberate exclusions. These include unsafe
 archive password resets/SQL restore, unverified payment QR details, provider-based
 automatic messaging, standalone non-return credits, and mixed per-line VAT.
+
+## Item and Business Masters
+
+Back up the database, then run `php database/migrate.php` to apply
+`005_item_masters`. Existing items remain inventory items for resale. Existing
+business records default to resale/both; historical transactions are not
+reclassified or reposted. No additional software or packages are required.
+
+Open **Lists -> Items & Inventory** for the item catalog and master setup:
+
+- Inventory, assembly, non-inventory, and service items each support **For
+  Purchase**, **For Sale**, and **For Resale**. Resale permits both purchasing
+  and selling. Parent templates are excluded from transaction selection.
+- **Record Usage** applies the same three choices to chart-of-accounts records,
+  units, bins, customers, vendors, locations, classes, and departments. Customer
+  and vendor detail pages also expose their usage setting. Restrictions are
+  checked in transaction entry and source accounting posting. These flags do
+  not change a party's customer/vendor role or an account's accounting category.
+- Units, location-specific bins, classes, and departments have maintained codes,
+  names, active states, audited changes, and stale-edit protection. Links open
+  the existing COA, customer, vendor, and location maintenance screens.
+- Item defaults include a base unit, primary supplier, location/bin, class,
+  department, and inventory/income/expense-or-COGS accounts. Transaction lines
+  capture classification and account defaults; later item-default changes do not
+  rewrite posted entries. Blank account mappings use system posting accounts.
+- Inventory and assembly items move physical stock. Service and non-inventory
+  items never create stock, inventory COGS, stock adjustments, or stock transfers.
+  Their accepted PO receipts accrue expense against GRIR, bills clear GRIR, and
+  direct purchases debit expense. Sales use the item's income account.
+
+### Matrix Items
+
+Enable **Features -> Matrix Items**, save an item as a **Matrix Parent**, then
+enter option names and comma-separated values under **Matrix Variants**. Use
+**Generate Missing Variants** to create up to 100 combinations from at most three
+axes. All four item types and all three usages support matrix families.
+
+Each variant has a unique SKU, its own prices, and, for physical item types, its
+own stock balance. Type and usage are inherited. Regenerating combinations does
+not duplicate variants. Existing options cannot be removed or renamed; additions
+generate only missing combinations. Active families must be deactivated before
+the matrix feature can be disabled. POS supports searching variant SKUs.
+
+### Boundaries and Verification
+
+Assembly item records are stock-tracked; BOM definitions, manufacturing build
+orders, and component consumption are not implemented. Bins currently provide
+location-linked item/default transaction tags, not a complete bin-transfer or
+bin-quantity ledger. Classes/departments are captured as transaction-line defaults;
+segmented GL reporting and transaction-level override controls are not included.
+The unit master defines base units; existing case packaging supplies the existing
+alternate-unit conversion, not a general multi-unit conversion hierarchy.
+
+On a fresh disposable `_test` database, run accounting checks first, then:
+
+```sh
+php tests/catalog.php
+APP_BASE_URL=http://127.0.0.1:8081/ php tests/catalog_http.php
+node tests/browser_catalog.mjs
+```
+
+The browser suite uses the installed Chrome debugging endpoint on port 9223 and
+the disposable app on port 8081. It checks matrix generation for every item type,
+independent variant pricing, master usage controls, and layouts down to 320px.
+Keep running the existing procurement, purchase-cycle, enterprise, and accounting
+suites when extending these shared transaction rules.

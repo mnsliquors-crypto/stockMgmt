@@ -13,11 +13,13 @@ final class ConflictException extends \RuntimeException {}
 final class OrderService {
     private array $user;
     private bool $enterprise;
+    private bool $cycle;
 
     public function __construct(private \mysqli $db, private int $actor) {
         $this->user = $this->row('SELECT id,username,type FROM users WHERE id=?', [$actor]) ?? [];
         if (!in_array((int)($this->user['type'] ?? 0), [1,2], true)) throw new PermissionException('An active administrator or staff account is required.');
         $this->enterprise=$this->db->query("SHOW TABLES LIKE 'erp_po_context'")->num_rows>0;
+        $this->cycle=$this->db->query("SHOW TABLES LIKE 'po_received_quantities'")->num_rows>0;
     }
 
     private function query(string $sql, array $parameters = []): \mysqli_result|bool {
@@ -121,8 +123,10 @@ final class OrderService {
         $id=empty($input['id'])?0:$this->id($input['id']);
         $previousLocation=$id&&$this->enterprise?($this->row('SELECT location_id FROM erp_po_context WHERE order_id=?',[$id])['location_id']??1):1;
         $location=empty($input['location_id'])?(int)$previousLocation:$this->id($input['location_id']);
+        \App\Enterprise\CatalogService::assertRecordUsage($this->db,'location',$location,true);
         if ($this->enterprise&&!$this->row('SELECT id FROM erp_locations WHERE id=? AND active=1',[$location])) throw new \InvalidArgumentException('Choose an active location.');
         $vendor = $this->row("SELECT id,display_name FROM entity_list WHERE id=? AND entity_type='Supplier' AND status=1 LOCK IN SHARE MODE", [$this->id($input['vendor_id'] ?? '')]);
+        \App\Enterprise\CatalogService::assertRecordUsage($this->db,'vendor',(int)($vendor['id']??0),true);
         if (!$vendor) throw new \InvalidArgumentException('Choose an active supplier.');
         $date = $this->date($input['order_date'] ?? '');
         $expected = empty($input['expected_date']) ? null : $this->date($input['expected_date']);
@@ -136,6 +140,8 @@ final class OrderService {
         foreach ($lines as $line) {
             if (!is_array($line)) throw new \InvalidArgumentException('Invalid order line.');
             $item = $this->row('SELECT id,name,unit FROM item_list WHERE id=? AND status=1 LOCK IN SHARE MODE', [$this->id($line['item_id'] ?? '')]);
+            \App\Enterprise\CatalogService::assertUsage($this->db,(int)($item['id']??0),true);
+            \App\Enterprise\CatalogService::assertItemMasters($this->db,(int)($item['id']??0),true,$location);
             if (!$item) throw new \InvalidArgumentException('Choose an active item on each line.');
             if (isset($clean[$item['id']])) throw new \InvalidArgumentException('An item can appear only once per order.');
             $quantity = $this->amount($line['quantity'] ?? '', 4);
@@ -255,7 +261,8 @@ final class OrderService {
             if ($this->row('SELECT id FROM po_receipts WHERE vendor_id=? AND invoice_number=?', [$order['vendor_id'], $invoice])) throw new ConflictException('This supplier invoice has already been received.');
             $orderLines = array_column($this->rows('SELECT * FROM po_lines WHERE order_id=? ORDER BY item_id FOR UPDATE', [$id]), null, 'id');
             foreach ($quantities as $lineId => $quantity) if (!isset($orderLines[$lineId])) throw new \InvalidArgumentException('A receiving line does not belong to this order.');
-            $prior = array_column($this->rows('SELECT r.order_line_id,SUM(r.quantity) AS quantity,SUM(r.line_total) AS amount FROM po_receipt_lines r JOIN po_receipts h ON h.id=r.receipt_id WHERE h.order_id=? GROUP BY r.order_line_id', [$id]), null, 'order_line_id');
+            if ($this->cycle && $this->row('SELECT transaction_id FROM po_supplier_invoices WHERE vendor_id=? AND invoice_number=?', [$order['vendor_id'],$invoice])) throw new ConflictException('This supplier invoice has already been recorded.');
+            $prior = array_column($this->rows($this->cycle ? 'SELECT r.* FROM po_received_quantities r JOIN po_lines l ON l.id=r.order_line_id WHERE l.order_id=?' : 'SELECT r.order_line_id,SUM(r.quantity) AS quantity,SUM(r.line_total) AS amount FROM po_receipt_lines r JOIN po_receipts h ON h.id=r.receipt_id WHERE h.order_id=? GROUP BY r.order_line_id', [$id]), null, 'order_line_id');
             $received = []; $subtotal = '0.00'; $complete = true;
             foreach ($orderLines as $lineId => $line) {
                 $quantity = $quantities[$lineId] ?? '0.0000';
@@ -270,7 +277,7 @@ final class OrderService {
                 $subtotal = Money::add($subtotal, $amount);
             }
             if (!$received || Money::compare($subtotal, '0') <= 0) throw new \InvalidArgumentException('Receive at least one positive-value quantity.');
-            $previous = $this->row('SELECT COALESCE(SUM(subtotal),0) AS subtotal,COALESCE(SUM(tax),0) AS tax FROM po_receipts WHERE order_id=?', [$id]);
+            $previous = $this->row('SELECT COALESCE(SUM(subtotal),0) AS subtotal,COALESCE(SUM(tax),0) AS tax FROM '.($this->cycle?'po_invoiced_totals':'po_receipts').' WHERE order_id=?', [$id]);
             $tax = Money::subtract(Money::decimal(bcdiv(bcmul(Money::add($previous['subtotal'], $subtotal), $order['tax_rate'], 8), '100', 8)), $previous['tax']);
             $total = Money::add($subtotal, $tax);
             $sequence = (int)$this->row('SELECT COUNT(*) AS count FROM po_receipts WHERE order_id=?', [$id])['count'] + 1;
@@ -298,6 +305,7 @@ final class OrderService {
             $this->query('INSERT INTO po_receipts (reference,order_id,transaction_id,vendor_id,invoice_number,received_date,notes,subtotal,tax,total,request_key,payload_hash,created_by,created_username) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [$reference, $id, $transaction, $order['vendor_id'], $invoice, $date, $notes, $subtotal, $tax, $total, $key, $hash, $this->actor, $this->user['username']]);
             $receipt = (int)$this->db->insert_id;
+            if($this->cycle)$this->query('INSERT INTO po_supplier_invoices(vendor_id,invoice_number,transaction_id) VALUES(?,?,?)',[$order['vendor_id'],$invoice,$transaction]);
             foreach ($received as $entry) $this->query('INSERT INTO po_receipt_lines (receipt_id,order_line_id,quantity,line_total) VALUES (?,?,?,?)', [$receipt, $entry['line']['id'], $entry['quantity'], $entry['amount']]);
             $this->query('INSERT INTO po_receipt_seals (receipt_id) VALUES (?)', [$receipt]);
             $this->query('UPDATE po_orders SET status=?,version=version+1 WHERE id=?', [$complete ? 'received' : 'part_received', $id]);
@@ -327,7 +335,7 @@ final class OrderService {
         });
     }
 
-    private function purchaseMetrics(string $date): void {
+    public function purchaseMetrics(string $date): void {
         $this->query("INSERT INTO summary_daily_metrics (metric_date,total_sales,total_purchases,total_expenses,total_discount,total_cogs,net_profit)
             SELECT ?,s.sales,s.purchases,s.expenses,s.discount,s.cogs,s.sales-s.cogs-s.expenses FROM (
                 SELECT COALESCE(SUM(IF(type='sale',total_amount,0)),0) sales,
@@ -359,8 +367,16 @@ final class OrderService {
         if (!$order) throw new \RuntimeException('Purchase order not found.');
         $order['location_id']=$this->enterprise?(int)($this->row('SELECT location_id FROM erp_po_context WHERE order_id=?',[$id])['location_id']??1):1;
         $order['lines'] = $this->rows('SELECT l.*,COALESCE(r.received,0) AS received,l.quantity-COALESCE(r.received,0) AS outstanding
-            FROM po_lines l LEFT JOIN (SELECT order_line_id,SUM(quantity) AS received FROM po_receipt_lines GROUP BY order_line_id) r ON r.order_line_id=l.id WHERE l.order_id=? ORDER BY l.id', [$id]);
+            FROM po_lines l LEFT JOIN '.($this->cycle?'(SELECT order_line_id,quantity AS received FROM po_received_quantities)':'(SELECT order_line_id,SUM(quantity) AS received FROM po_receipt_lines GROUP BY order_line_id)').' r ON r.order_line_id=l.id WHERE l.order_id=? ORDER BY l.id', [$id]);
         $order['receipts'] = $this->rows('SELECT * FROM po_receipts WHERE order_id=? ORDER BY id', [$id]);
+        if($this->cycle){
+            $billed=array_column($this->rows("SELECT order_line_id,SUM(quantity) AS quantity FROM (
+                SELECT r.order_line_id,r.quantity FROM po_receipt_lines r JOIN po_lines o ON o.id=r.order_line_id WHERE o.order_id=?
+                UNION ALL SELECT r.order_line_id,l.quantity FROM po_vendor_bill_lines l JOIN po_vendor_bills b ON b.id=l.bill_id AND b.status='recorded'
+                    JOIN po_item_receipt_lines r ON r.id=l.receipt_line_id WHERE b.order_id=?
+                ) billed GROUP BY order_line_id",[$id,$id]),'quantity','order_line_id');
+            foreach($order['lines']as &$line){$line['billed']=$billed[$line['id']]??'0.0000';$line['unbilled']=bcsub($line['received'],$line['billed'],4);}unset($line);
+        }
         if ($this->enterprise) foreach ($order['lines'] as &$line) {
             $line['unit_factor']=$this->row('SELECT unit_factor FROM erp_po_line_units WHERE order_line_id=?',[$line['id']])['unit_factor']??'1.0000';
         }
@@ -383,22 +399,24 @@ final class OrderService {
         return ['rows' => $rows, 'count' => $count, 'page' => $page, 'pages' => max(1, (int)ceil($count / 50))];
     }
     public function receipts(): array { return $this->rows('SELECT r.*,o.reference AS order_reference,o.vendor_name FROM po_receipts r JOIN po_orders o ON o.id=r.order_id ORDER BY r.id DESC LIMIT 250'); }
-    public function suppliers(): array { return $this->rows("SELECT id,display_name FROM entity_list WHERE entity_type='Supplier' AND status=1 ORDER BY display_name"); }
-    public function items(): array { return $this->rows('SELECT id,name,unit,cost,quantity,vendor_id FROM item_list WHERE status=1 ORDER BY name'); }
+    public function suppliers(): array { return $this->rows("SELECT id,display_name FROM ".\App\Enterprise\CatalogService::partySource($this->db,true)." WHERE entity_type='Supplier' AND status=1 ORDER BY display_name"); }
+    public function items(): array { return $this->rows('SELECT id,name,unit,cost,quantity,vendor_id FROM '.\App\Enterprise\CatalogService::itemSource($this->db,true).' WHERE status=1 ORDER BY name'); }
 
     public function replenishment(?int $vendor = null): array {
         $unitFactor=$this->enterprise?'COALESCE(u.unit_factor,1)':'1';
         $unitJoin=$this->enterprise?' LEFT JOIN erp_po_line_units u ON u.order_line_id=l.id ':'';
+        $receivedSource=$this->cycle?'SELECT order_line_id,quantity AS received FROM po_received_quantities':'SELECT order_line_id,SUM(quantity) AS received FROM po_receipt_lines GROUP BY order_line_id';
+        $stockItems=\App\Enterprise\CatalogService::available($this->db)?'erp_inventory_items':'item_list';
         $rows = $this->rows("SELECT i.id,i.name,i.unit,i.vendor_id,i.cost,i.quantity,i.reorder_level,e.display_name AS vendor_name,
             COALESCE(p.on_order,0) AS on_order,COALESCE(p.planned,0) AS planned,
             i.quantity+COALESCE(p.on_order,0)+COALESCE(p.planned,0) AS projected,
             GREATEST(i.reorder_level-i.quantity-COALESCE(p.on_order,0)-COALESCE(p.planned,0),0) AS suggested
-            FROM item_list i LEFT JOIN entity_list e ON e.id=i.vendor_id AND e.entity_type='Supplier' AND e.status=1
+            FROM $stockItems i LEFT JOIN entity_list e ON e.id=i.vendor_id AND e.entity_type='Supplier' AND e.status=1
             LEFT JOIN (
                 SELECT l.item_id,CAST(SUM(IF(o.status IN ('approved','part_received'),(l.quantity-COALESCE(r.received,0))*$unitFactor,0)) AS DECIMAL(18,4)) AS on_order,
                     CAST(SUM(IF(o.status IN ('draft','pending'),l.quantity*$unitFactor,0)) AS DECIMAL(18,4)) AS planned
                 FROM po_lines l JOIN po_orders o ON o.id=l.order_id $unitJoin
-                LEFT JOIN (SELECT order_line_id,SUM(quantity) AS received FROM po_receipt_lines GROUP BY order_line_id) r ON r.order_line_id=l.id
+                LEFT JOIN ($receivedSource) r ON r.order_line_id=l.id
                 WHERE o.status IN ('draft','pending','approved','part_received') GROUP BY l.item_id
             ) p ON p.item_id=i.id WHERE i.status=1 AND i.quantity<=i.reorder_level" . ($vendor ? ' AND i.vendor_id=?' : '') . ' ORDER BY suggested DESC,i.name', $vendor ? [$vendor] : []);
         return $rows;

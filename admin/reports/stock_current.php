@@ -7,19 +7,19 @@ $qry = $conn->query("
     SELECT i.id, i.name, i.selling_price as sell_price,
            c.name as category,
            COALESCE((SELECT SUM(CASE 
-                                WHEN t.type IN ('purchase', 'opening_stock', 'adjustment') THEN ti.quantity 
+                                WHEN t.type IN ('purchase', 'item_receipt', 'opening_stock', 'adjustment') THEN ti.quantity
                                 WHEN t.type = 'return' AND EXISTS(SELECT 1 FROM entity_list WHERE id = t.entity_id AND entity_type = 'Customer') THEN ti.quantity
                                 ELSE 0 END) 
-                      FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id 
+                      FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id
                       WHERE ti.item_id=i.id),0) as pur_qty,
            COALESCE((SELECT SUM(CASE 
                                 WHEN t.type = 'sale' THEN ti.quantity 
                                 WHEN t.type = 'return' AND EXISTS(SELECT 1 FROM entity_list WHERE id = t.entity_id AND entity_type = 'Supplier') THEN ti.quantity
                                 ELSE 0 END) 
-                      FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id 
+                      FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id
                       WHERE ti.item_id=i.id),0) as sal_qty,
            i.cost as avg_cost
-    FROM item_list i
+    FROM {$stock_item_source} i
     LEFT JOIN category_list c ON i.category_id = c.id
     WHERE i.status=1
     {$and_search}

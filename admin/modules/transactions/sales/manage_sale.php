@@ -12,7 +12,7 @@ if(isset($_GET['customer_id']) && !empty($_GET['customer_id'])){
     $customer_id = intval($_GET['customer_id']);
 }
 $item_arr = array();
-$item_qry = $conn->query("SELECT i.*, c.name as category, i.quantity as available FROM `item_list` i LEFT JOIN category_list c ON i.category_id = c.id WHERE i.status = 1 ORDER BY i.name ASC");
+$item_qry = $conn->query("SELECT i.*, c.name as category, i.quantity as available FROM `{$sellable_item_source}` i LEFT JOIN category_list c ON i.category_id = c.id WHERE i.status = 1 ORDER BY i.name ASC");
 while($row = $item_qry->fetch_assoc()){
     $item_arr[$row['id']] = $row;
 }
@@ -48,7 +48,7 @@ while($row = $item_qry->fetch_assoc()){
                             <select name="customer_id" id="customer_id" class="custom-select select2">
                                 <option value="" <?php echo !isset($customer_id) ? 'selected' : '' ?>>Walk-in Customer</option>
                                 <?php 
-                                $customer = $conn->query("SELECT *, display_name as name FROM `entity_list` WHERE entity_type = 'Customer' AND status = 1 ORDER BY `display_name` ASC");
+                                $customer = $conn->query("SELECT *, display_name as name FROM `{$sellable_party_source}` WHERE entity_type = 'Customer' AND status = 1 ORDER BY `display_name` ASC");
                                 while($row = $customer->fetch_assoc()):
                                     // Default to Walk In (ID 6) if no id is provided (new sale)
                                     $selected = '';

@@ -90,12 +90,22 @@ try {
     const desktop = await layout('Desktop order');
     await login('procurement_browser_receiver', 'ProcurementBrowser123!');
     await navigate('admin/?page=transactions/procurement&id=' + id);
+    const separate = await evaluate('document.querySelector("#po-receive-form").dataset.separate === "1"');
     const invoice = 'BROWSER-' + Date.now();
     await evaluate(`document.querySelector('.po-receive-quantity').value='2';document.querySelector('#po-invoice').value=${JSON.stringify(invoice)};document.querySelector('#po-receive-form').requestSubmit();`);
+    if (separate) {
+        await waitFor('!!document.querySelector(".pc-workspace") && location.href.includes("item_receipts&id=")', 'partial item receipt');
+        await navigate('admin/?page=transactions/procurement&id=' + id);
+        await waitFor('document.querySelector(".procurement-workspace .badge")?.innerText === "Part Received"', 'partial order');
+        await evaluate('document.querySelector("#po-fill-outstanding").click();document.querySelector("#po-receive-form").requestSubmit()');
+        await waitFor('!!document.querySelector(".pc-workspace") && location.href.includes("item_receipts&id=")', 'final item receipt');
+        await navigate('admin/?page=transactions/procurement&id=' + id);
+    } else {
     await waitFor('document.querySelector(".procurement-workspace .badge")?.innerText === "Part Received"', 'partial delivery');
     await evaluate(`document.querySelector('#po-fill-outstanding').click();document.querySelector('#po-invoice').value=${JSON.stringify(invoice)};document.querySelector('#po-receive-form').requestSubmit();`);
     await waitFor('document.querySelector("#procurement-message").innerText.includes("invoice")', 'duplicate invoice rejection');
     await evaluate(`document.querySelector('#po-invoice').value=${JSON.stringify(invoice + '-FINAL')};document.querySelector('#po-receive-form').requestSubmit();`);
+    }
     await waitFor('document.querySelector(".procurement-workspace .badge")?.innerText === "Received"', 'final delivery');
     if (await evaluate('document.querySelector("#po-receive-form").querySelectorAll(".po-receive-quantity").length') !== 0) throw new Error('Completed order can still receive goods');
     await screenshot('order-received-desktop');

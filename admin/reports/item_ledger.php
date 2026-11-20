@@ -9,17 +9,17 @@ $t_in = $t_out = 0;
 $item_name = '';
 
 if ($item_id) {
-    $item_res = $conn->query("SELECT name FROM item_list WHERE id={$item_id} LIMIT 1")->fetch_assoc();
+    $item_res = $conn->query("SELECT name FROM {$stock_item_source} WHERE id={$item_id} LIMIT 1")->fetch_assoc();
     $item_name = $item_res['name'] ?? '';
 
     // Unified opening balance before 'from'
     $opening_bal = floatval($conn->query("
         SELECT COALESCE(SUM(CASE 
-            WHEN t.type IN ('purchase', 'opening_stock', 'adjustment') THEN ti.quantity 
+            WHEN t.type IN ('purchase', 'item_receipt', 'opening_stock', 'adjustment') THEN ti.quantity
             WHEN t.type = 'sale' THEN -ti.quantity 
             WHEN t.type = 'return' THEN (CASE WHEN EXISTS (SELECT 1 FROM entity_list WHERE id = t.entity_id AND entity_type = 'Supplier') THEN -ti.quantity ELSE ti.quantity END)
             ELSE 0 END), 0)
-        FROM transaction_items ti 
+        FROM {$inventory_stock_source} ti
         JOIN transactions t ON ti.transaction_id = t.id 
         WHERE ti.item_id = '{$item_id}' AND DATE(t.transaction_date) < '{$from}'
     ")->fetch_array()[0]);
@@ -28,14 +28,14 @@ if ($item_id) {
     $txns = $conn->query("
         SELECT ti.*, t.transaction_date as date_created, t.reference_code as ref_code, t.type as txn_type_raw,
             (SELECT entity_type FROM entity_list WHERE id = t.entity_id LIMIT 1) as entity_type
-        FROM transaction_items ti
+        FROM {$inventory_stock_source} ti
         JOIN transactions t ON ti.transaction_id = t.id
         WHERE ti.item_id={$item_id}
           AND DATE(t.transaction_date) BETWEEN '{$from}' AND '{$to}'
         ORDER BY t.transaction_date ASC
     ");
     while ($r = $txns->fetch_assoc()) {
-        if ($r['txn_type_raw'] == 'purchase') {
+        if (in_array($r['txn_type_raw'],['purchase','item_receipt'],true)) {
             $r['qty_in'] = $r['quantity']; $r['qty_out'] = 0; $running += $r['quantity']; $t_in += $r['quantity']; $r['txn_type'] = "Purchase";
         } elseif ($r['txn_type_raw'] == 'sale') {
             $r['qty_in'] = 0; $r['qty_out'] = $r['quantity']; $running -= $r['quantity']; $t_out += $r['quantity']; $r['txn_type'] = "Sale";
@@ -56,7 +56,7 @@ if ($item_id) {
     }
 }
 
-$items = $conn->query("SELECT id,name FROM item_list WHERE status=1 ORDER BY name");
+$items = $conn->query("SELECT id,name FROM {$stock_item_source} WHERE status=1 ORDER BY name");
 ?>
 <div class="card card-outline card-warning shadow">
     <div class="card-header">

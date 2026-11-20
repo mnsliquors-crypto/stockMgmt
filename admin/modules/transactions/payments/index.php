@@ -34,6 +34,8 @@
                         <?php 
                         $i = 1;
                         $i = 1;
+                        $cyclePayments=[];
+                        if(!empty($purchase_cycle_available))foreach($conn->query('SELECT transaction_id FROM po_cycle_payments')->fetch_all(MYSQLI_ASSOC)as $entry)$cyclePayments[(int)$entry['transaction_id']]=true;
                         $qry = $conn->query("SELECT 
                                                 t.reference_code as payment_code, 
                                                 MAX(t.id) as id, 
@@ -79,10 +81,12 @@
                                     </button>
                                     <div class="dropdown-menu" role="menu">
                                         <a class="dropdown-item" href="<?php echo base_url.'admin?page=transactions/payments/view_payment&id='.$row['id'] ?>"><span class="fa fa-eye text-dark"></span> View</a>
+                                        <?php if(!isset($cyclePayments[(int)$row['id']])): ?>
                                         <div class="dropdown-divider"></div>
                                         <a class="dropdown-item" href="<?php echo base_url.'admin?page=transactions/payments/manage_payment&id='.$row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
                                         <div class="dropdown-divider"></div>
                                         <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
+                                        <?php endif ?>
                                     </div>
                                 </td>
                             </tr>

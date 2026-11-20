@@ -3,6 +3,10 @@ if(!isset($conn) || !$conn){
     require_once __DIR__ . '/../../../../config.php';
 }
 $id = $_GET['id'] ?? null;
+if(!empty($purchase_cycle_available)){
+    $linkedBill=$db->queryPrepared('SELECT id FROM po_vendor_bills WHERE transaction_id=?','i',[(int)$id])->fetch_assoc();
+    if($linkedBill){$billUrl=base_url.'admin/?page=transactions/vendor_bills&id='.$linkedBill['id'];echo '<a href="'.htmlspecialchars($billUrl,ENT_QUOTES,'UTF-8').'">Open Supplier Bill</a><script>location.replace('.json_encode($billUrl).');</script>';return;}
+}
 $qry = $conn->query("SELECT p.*, reference_code as po_code, entity_id as vendor_id, transaction_date as date_created, s.display_name as vendor_name 
                       FROM transactions p 
                       LEFT JOIN entity_list s ON p.entity_id = s.id AND s.entity_type = 'Supplier'

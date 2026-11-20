@@ -1,4 +1,5 @@
 <?php
+$cyclePayment=!empty($purchase_cycle_available)&&$db->queryPrepared('SELECT transaction_id FROM po_cycle_payments WHERE transaction_id=?','i',[(int)($_GET['id']??0)])->num_rows;
 if(isset($_GET['id'])){
     $qry = $conn->query("SELECT p.id, p.reference_code as payment_code, p.total_amount as amount, p.transaction_date as date_created, p.remarks, p.account_id, a.name as account_name, p.created_by, p.updated_by, p.date_updated, p.date_created as system_date FROM `transactions` p left join account_list a on p.account_id = a.id where p.id = '{$_GET['id']}' AND p.type='payment'");
     if($qry->num_rows > 0){
@@ -26,7 +27,7 @@ if(isset($_GET['id'])){
     $total_paid = $conn->query("SELECT SUM(total_amount) as total FROM transactions WHERE reference_code = '{$payment_code}' AND type='payment'")->fetch_assoc()['total'] ?? 0;
     
     $accounts_breakdown = [];
-    $acc_qry = $conn->query("SELECT a.name, SUM(tl.amount) as amount FROM transaction_list tl JOIN account_list a ON tl.account_id = a.id WHERE tl.ref_table = 'transactions' AND tl.trans_code = '{$payment_code}' AND tl.type = 1 GROUP BY tl.account_id");
+    $acc_qry = $conn->query("SELECT MAX(a.name) AS name, SUM(tl.amount) as amount FROM transaction_list tl JOIN account_list a ON tl.account_id = a.id WHERE tl.ref_table = 'transactions' AND tl.trans_code = '{$payment_code}' AND tl.type = {$type} GROUP BY tl.account_id");
     while($ar = $acc_qry->fetch_assoc()){
         $accounts_breakdown[] = $ar;
     }
@@ -35,7 +36,7 @@ if(isset($_GET['id'])){
     $allocations = [];
     $t_bill_amt = 0;
     $t_paid_amt = 0;
-    $alloc_qry = $conn->query("SELECT p.parent_id, p.transaction_date, p.remarks as p_remarks, SUM(p.total_amount) as paid_amount, b.reference_code as bill_code, b.total_amount as bill_total, b.transaction_date as bill_date
+    $alloc_qry = $conn->query("SELECT p.parent_id, MAX(p.transaction_date) AS transaction_date, MAX(p.remarks) as p_remarks, SUM(p.total_amount) as paid_amount, MAX(b.reference_code) as bill_code, MAX(b.total_amount+b.tax) as bill_total, MAX(b.transaction_date) as bill_date
                                FROM transactions p 
                                INNER JOIN transactions b ON p.parent_id = b.id 
                                WHERE p.reference_code = '{$payment_code}' AND p.type='payment'
@@ -58,7 +59,7 @@ if(isset($_GET['id'])){
             </h3>
 
             <div class="card-tools">
-                <a href="./?page=transactions/payments/manage_payment&id=<?php echo $id ?>" class="btn btn-flat btn-sm btn-primary" title="Edit"><i class="fa fa-edit"></i></a>
+                <?php if(!$cyclePayment): ?><a href="./?page=transactions/payments/manage_payment&id=<?php echo $id ?>" class="btn btn-flat btn-sm btn-primary" title="Edit"><i class="fa fa-edit"></i></a><?php endif ?>
                 <button class="btn btn-flat btn-sm btn-danger" id="delete_payment" type="button" title="Delete"><i class="fa fa-trash"></i></button>
                 <a class="btn btn-flat btn-sm btn-dark" href="./?page=transactions/payments" title="Back to List"><i class="fa fa-list"></i></a>
                 <button class="btn btn-flat btn-sm btn-success" type="button" id="print_btn" title="Print"><i class="fa fa-print"></i></button>

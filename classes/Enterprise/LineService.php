@@ -15,6 +15,8 @@ final class LineService extends Service {
         $snapshots=[];$totals=[];$quantities=[];$canonicalPrices=[];$skuQuantities=[];
         foreach ($items as $index=>$rawItem) {
             $item=$this->id($rawItem);$quantity=$this->decimal($qty[$index]??'',4,true);$price=$this->decimal($prices[$index]??'');
+            if($mode!=='return')CatalogService::assertUsage($this->db,$item,$mode==='purchase');
+            if($mode!=='return')CatalogService::assertItemMasters($this->db,$item,$mode==='purchase',$location);
             $code=$this->text($units[$index]??'base',10);
             $unit=$inventory->unit($item,$code,$mode==='purchase');
             if ($mode==='return'&&$code==='case'&&!empty($input['parent_id'])) {

@@ -17,6 +17,15 @@ $db = new DBConnection;
 $conn = $db->conn;
 $enterprise_available=$conn->query("SHOW TABLES LIKE 'erp_schema_versions'")->num_rows
     && $conn->query("SELECT version FROM erp_schema_versions WHERE version='".ERP_V3_SCHEMA_VERSION."'")->num_rows>0;
+$purchase_cycle_available=$enterprise_available&&$conn->query("SELECT version FROM erp_schema_versions WHERE version='004_purchase_cycle'")->num_rows>0;
+$item_catalog_available=$enterprise_available&&$conn->query("SELECT version FROM erp_schema_versions WHERE version='005_item_masters'")->num_rows>0;
+require_once __DIR__.'/classes/Enterprise/CatalogService.php';
+$inventory_stock_source=$item_catalog_available?'erp_stock_items':'transaction_items';
+$stock_item_source=$item_catalog_available?'erp_inventory_items':'item_list';
+$purchasable_item_source=$item_catalog_available?'erp_purchasable_items':'item_list';
+$sellable_item_source=$item_catalog_available?'erp_sellable_items':'item_list';
+$purchasable_party_source=$item_catalog_available?'erp_purchase_parties':'entity_list';
+$sellable_party_source=$item_catalog_available?'erp_sale_parties':'entity_list';
 require_once __DIR__ . '/classes/Enterprise/Access.php';
 require_once __DIR__ . '/classes/Enterprise/Settlement.php';
 App\Enterprise\Access::enforce($conn);

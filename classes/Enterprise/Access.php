@@ -16,10 +16,10 @@ final class Access {
 
     public const PAGE_SCOPES=['home'=>'dashboard','legacy_dashboard'=>'dashboard','pos'=>'sales','sales'=>'sales','purchases'=>'purchases','payments'=>'payments','expenses'=>'expenses','returns'=>'sales',
             'reports/'=>'reports','finance/accounting'=>'accounting','finance/cash_counts'=>'payments',
-            'transactions/procurement'=>'procurement','transactions/sales'=>'sales','transactions/purchases'=>'purchases','transactions/payments'=>'payments',
+            'transactions/procurement'=>'procurement','transactions/item_receipts'=>'procurement','transactions/vendor_bills'=>'purchases','transactions/sales'=>'sales','transactions/purchases'=>'purchases','transactions/payments'=>'payments',
             'transactions/expenses'=>'expenses','transactions/returns'=>'sales','transactions/stock_adjustments'=>'inventory','transactions/opening_balances'=>'accounting',
             'master/items'=>'inventory','master/stocks'=>'inventory','master/categories'=>'inventory','master/customers'=>'sales','master/vendors'=>'purchases','master/accounts'=>'payments','master/bank_accounts'=>'payments',
-            'enterprise/credits'=>'payments','enterprise/dashboard'=>'dashboard','enterprise/receipts'=>'sales','enterprise/inventory'=>'inventory','enterprise/promotions'=>'promotions','enterprise/activities'=>'activities','enterprise/reports'=>'reports','enterprise/assistant'=>'assistant'];
+            'enterprise/catalog'=>'inventory','enterprise/credits'=>'payments','enterprise/dashboard'=>'dashboard','enterprise/receipts'=>'sales','enterprise/inventory'=>'inventory','enterprise/promotions'=>'promotions','enterprise/activities'=>'activities','enterprise/reports'=>'reports','enterprise/assistant'=>'assistant'];
 
     public static function pageScope(string $page): ?string {
         foreach (self::PAGE_SCOPES as $prefix=>$scope) if ($page===$prefix||str_starts_with($page,rtrim($prefix,'/').'/')) return $scope;
@@ -51,6 +51,7 @@ final class Access {
             }
             $page=is_string($_GET['page']??null)?$_GET['page']:'home';
             $scope=self::pageScope($page);
+            if($page==='enterprise/catalog'&&($_GET['view']??'')==='usage')$scope=match($_GET['record_type']??'account'){'account'=>'accounting','customer'=>'sales','vendor'=>'purchases',default=>'inventory'};
         } elseif ($relative==='classes/Enterprise.php') {
             $action=is_string($_GET['f']??null)?$_GET['f']:'';
             $scope=match (true) {

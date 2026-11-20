@@ -34,14 +34,14 @@
                      $qry = $conn->query("
                          SELECT i.*, c.name as category, s.display_name as vendor,
                         (SELECT SUM(CASE 
-                                    WHEN t.type IN ('purchase', 'opening_stock') THEN ti.quantity 
+                                    WHEN t.type IN ('purchase', 'item_receipt', 'opening_stock') THEN ti.quantity
                                     WHEN t.type = 'sale' THEN -ti.quantity 
                                     WHEN t.type = 'adjustment' THEN ti.quantity 
                                     WHEN t.type = 'return' THEN (CASE WHEN t.entity_id IN (SELECT id FROM entity_list WHERE entity_type='Supplier') THEN -ti.quantity ELSE ti.quantity END)
                                     ELSE 0 END) 
-                         FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id 
+                         FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id
                          WHERE ti.item_id = i.id) as available 
-                        FROM `item_list` i 
+                        FROM `{$stock_item_source}` i
                         LEFT JOIN category_list c ON i.category_id = c.id 
                         LEFT JOIN entity_list s ON i.vendor_id = s.id AND s.entity_type = 'Supplier'
                     ");

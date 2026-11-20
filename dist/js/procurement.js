@@ -16,7 +16,7 @@
         var buttons = root.find('button:enabled').add($('#po-reason-form button:enabled'));
         buttons.prop('disabled', true);
         (errorTarget || message).empty();
-        $.ajax({url: endpoint + action, method: 'POST', data: data, dataType: 'json'})
+        $.ajax({url: (action === 'receive_items' ? _base_url_ + 'classes/PurchaseCycle.php?f=' : endpoint) + action, method: 'POST', data: data, dataType: 'json'})
             .done(function (response) {
                 if (response.status === 'success') success(response.data);
                 else showError(response.msg || 'The operation could not be completed.', errorTarget);
@@ -100,7 +100,10 @@
         event.preventDefault();
         var data = Object.fromEntries(new FormData(this).entries());
         data.lines = $('#po-receiving-lines tbody tr').map(function () { return {order_line_id: $(this).data('line-id'), quantity: $(this).find('.po-receive-quantity').val()}; }).get();
-        submit('receive', data, function (result) { location.href = orderUrl + '&id=' + result.id; });
+        var separate = $(this).data('separate') === 1;
+        submit(separate ? 'receive_items' : 'receive', data, function (result) {
+            location.href = separate ? _base_url_ + 'admin/?page=transactions/item_receipts&id=' + result.id : orderUrl + '&id=' + result.id;
+        });
     });
     $('#po-fill-outstanding').on('click', function () { $('.po-receive-quantity').each(function () { $(this).val($(this).attr('max')); }); });
     $('#po-policy-form').on('submit', function (event) { event.preventDefault(); submit('save_policy', $(this).serialize(), function () { location.reload(); }); });

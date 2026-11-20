@@ -5,13 +5,13 @@ $and_search = $search ? " AND i.name LIKE '%{$search}%'" : '';
 $qry = $conn->query("
     SELECT i.id, i.name,
            COALESCE((SELECT SUM(CASE 
-                                WHEN t.type IN ('purchase', 'opening_stock', 'adjustment') THEN ti.quantity 
+                                WHEN t.type IN ('purchase', 'item_receipt', 'opening_stock', 'adjustment') THEN ti.quantity
                                 WHEN t.type = 'sale' THEN -ti.quantity 
                                 WHEN t.type = 'return' THEN (CASE WHEN EXISTS(SELECT 1 FROM entity_list WHERE id = t.entity_id AND entity_type = 'Supplier') THEN -ti.quantity ELSE ti.quantity END)
                                 ELSE 0 END) 
-                      FROM transaction_items ti JOIN transactions t ON ti.transaction_id = t.id 
+                      FROM {$inventory_stock_source} ti JOIN transactions t ON ti.transaction_id = t.id
                       WHERE ti.item_id=i.id),0) as available
-    FROM item_list i
+    FROM {$stock_item_source} i
     WHERE i.status=1 {$and_search}
     HAVING available < 10
     ORDER BY available ASC

@@ -13,6 +13,7 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
     <div class="card-header">
         <h3 class="card-title"><?php echo isset($id) ? "Update Item Details - ".htmlspecialchars($name) : "Add New Item" ?></h3>
         <div class="card-tools">
+            <?php if(!empty($item_catalog_available)): ?><a class="btn btn-sm btn-outline-primary" href="<?php echo base_url ?>admin/?page=enterprise/catalog<?php echo isset($id)?'&amp;id='.(int)$id:'&amp;new=1' ?>">Item Setup</a><?php endif ?>
             <a class="btn btn-flat btn-sm btn-dark" href="<?php echo base_url.'/admin?page=master/items'.(isset($id) ? '/view&id='.$id : '') ?>" title="Back"><i class="fa fa-angle-left"></i> Back</a>
         </div>
     </div>

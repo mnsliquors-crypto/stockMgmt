@@ -86,6 +86,7 @@
                   }
                   include __DIR__ . '/inc/posting_status.php';
                   include $include_file;
+                  include __DIR__.'/inc/master_usage.php';
               }else{
                   http_response_code(404);
                   echo '<div class="text-center py-5">

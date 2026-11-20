@@ -46,6 +46,7 @@ Class Master extends DBConnection {
         $row = $this->queryPrepared('SELECT * FROM transactions WHERE id = ? AND type = ? FOR UPDATE',
             'is', [(int)$id, $type])->fetch_assoc();
         if (!$row) throw new RuntimeException('Transaction not found or incorrect transaction type.');
+        if ($type==='purchase'&&$this->conn->query("SHOW TABLES LIKE 'po_vendor_bills'")->num_rows&&$this->queryPrepared('SELECT id FROM po_vendor_bills WHERE transaction_id=?','i',[(int)$id])->num_rows) throw new RuntimeException('This supplier bill belongs to the purchase cycle and cannot be edited or deleted here.');
         if ($type==='sale'&&$this->enterprise_enabled&&$this->queryPrepared('SELECT id FROM erp_pos_checkouts WHERE sale_id=? LIMIT 1','i',[(int)$id])->num_rows) throw new RuntimeException('POS sales with counter receipts are locked. Correct them with linked returns.');
         return $row;
     }
@@ -91,6 +92,7 @@ Class Master extends DBConnection {
         if (empty($parent_id)) return;
         $parent = $this->queryPrepared('SELECT * FROM transactions WHERE id=? FOR UPDATE', 'i', [(int)$parent_id])->fetch_assoc();
         $vendor_return = in_array(strtolower((string)$party_type), ['supplier','vendor'], true);
+        if ($parent&&$vendor_return&&$this->conn->query("SHOW TABLES LIKE 'po_vendor_bills'")->num_rows&&$this->queryPrepared('SELECT id FROM po_vendor_bills WHERE transaction_id=?','i',[(int)$parent_id])->num_rows) throw new RuntimeException('This bill is linked to separate item receipts. A combined stock-and-credit return is not supported; use the purchase-return cycle when available.');
         if (!$parent || !in_array($parent['type'], ['purchase','sale'], true) || (int)$parent['entity_id'] !== (int)$party_id
             || ($parent['type'] === 'purchase') !== $vendor_return) {
             throw new RuntimeException('A linked return must match its original invoice and party.');
@@ -413,6 +415,10 @@ Class Master extends DBConnection {
         if($old_qry && $old_qry->num_rows > 0) $old_data = $old_qry->fetch_assoc();
     }
 
+    if(!empty($old_data)&&$unit!==$old_data['unit']&&App\Enterprise\CatalogService::available($this->conn)
+        &&($this->queryPrepared('SELECT id FROM transaction_items WHERE item_id=? LIMIT 1','i',[(int)$id])->num_rows||$this->queryPrepared('SELECT id FROM po_lines WHERE item_id=? LIMIT 1','i',[(int)$id])->num_rows)){
+        return json_encode(['status'=>'failed','msg'=>'Base unit cannot change after an item is used.']);
+    }
     if(empty($id)){
         $sql = "INSERT INTO `item_list` (`name`, `description`, `category_id`, `vendor_id`, `cost`, `selling_price`, `mrp`, `opening_cost`, `average_cost`, `unit`, `reorder_level`, `tax_type`, `status`, `created_by`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = $this->conn->prepare($sql);
@@ -904,6 +910,7 @@ Class Master extends DBConnection {
                 $inventory=new App\Enterprise\InventoryService($this->conn,(int)$user_id);
                 foreach($needed as $item=>$required){
                     $this->queryPrepared('SELECT id FROM item_list WHERE id=? FOR UPDATE','i',[$item]);
+                    if(!App\Enterprise\CatalogService::tracked($this->conn,(int)$item))continue;
                     $available=$inventory->stock((int)($_POST['location_id']??1),$item)[0]??null;
                     if(!$available||bccomp($available['quantity'],$required,4)<0)throw new RuntimeException('Insufficient stock for '.($available['name']??'item').'.');
                 }
@@ -3255,6 +3262,9 @@ function get_balances_by_date(){
                 $alloc_amount = isset($allocation[$idx]) ? floatval($allocation[$idx]) : 0;
                 
                 if($alloc_amount <= 0) continue;
+                if ($this->conn->query("SHOW TABLES LIKE 'po_vendor_bills'")->num_rows && $this->queryPrepared('SELECT id FROM po_vendor_bills WHERE transaction_id=?','i',[$inv_id])->num_rows) {
+                    throw new Exception('Use the linked Supplier Bill payment form for this document.');
+                }
                 $bill_type = (int)$type === 2 ? 'purchase' : 'sale';
                 $invoice = $this->queryPrepared('SELECT (total_amount + tax) AS total_amount FROM transactions WHERE id=? AND entity_id=? AND type=? FOR UPDATE',
                     'iis', [$inv_id, $party_id, $bill_type])->fetch_assoc();
@@ -3393,7 +3403,9 @@ function get_balances_by_date(){
         $data = array();
         if ($this->enterprise_enabled) {
             $barcode=is_string($_GET['q']??null)?trim($_GET['q']):'';
-            $qry=$this->queryPrepared('SELECT i.*,c.name AS category,p.case_barcode,p.case_price,p.units_per_case FROM item_list i LEFT JOIN category_list c ON c.id=i.category_id LEFT JOIN erp_item_packaging p ON p.item_id=i.id WHERE i.status=1 AND (i.name LIKE ? OR i.description LIKE ? OR c.name LIKE ? OR p.barcode=? OR p.case_barcode=?) ORDER BY i.name LIMIT 20','sssss',[$q,$q,$q,$barcode,$barcode]);
+            $skuSql=App\Enterprise\CatalogService::available($this->conn)?' OR i.sku LIKE ?':'';
+            $parameters=[$q,$q,$q,$barcode,$barcode];if($skuSql!=='')$parameters[]=$q;
+            $qry=$this->queryPrepared('SELECT i.*,c.name AS category,p.case_barcode,p.case_price,p.units_per_case FROM '.App\Enterprise\CatalogService::itemSource($this->conn,false).' i LEFT JOIN category_list c ON c.id=i.category_id LEFT JOIN erp_item_packaging p ON p.item_id=i.id WHERE i.status=1 AND (i.name LIKE ? OR i.description LIKE ? OR c.name LIKE ? OR p.barcode=? OR p.case_barcode=?'.$skuSql.') ORDER BY i.name LIMIT 20',str_repeat('s',count($parameters)),$parameters);
         } else $qry = $this->queryPrepared('SELECT i.*, c.name as category FROM item_list i LEFT JOIN category_list c ON i.category_id = c.id WHERE i.status = 1 AND (i.name LIKE ? OR i.description LIKE ? OR c.name LIKE ?) ORDER BY i.name ASC LIMIT 20', 'sss', [$q, $q, $q]);
         while($row = $qry->fetch_assoc()){
             $case=$this->enterprise_enabled&&!empty($row['case_barcode'])&&$row['case_barcode']===($barcode??'');
@@ -3416,7 +3428,7 @@ function get_balances_by_date(){
         $type = isset($type) && strtolower($type) == 'vendor' ? 'Supplier' : (isset($type) && strtolower($type) == 'supplier' ? 'Supplier' : 'Customer');
         
         $data = array();
-        $qry = $this->queryPrepared('SELECT id, display_name as name, email, contact FROM entity_list WHERE entity_type = ? AND status = 1 AND (display_name LIKE ? OR email LIKE ? OR contact LIKE ?) ORDER BY display_name ASC LIMIT 10', 'ssss', [$type, $q, $q, $q]);
+        $qry = $this->queryPrepared('SELECT id, display_name as name, email, contact FROM '.App\Enterprise\CatalogService::partySource($this->conn,$type==='Supplier').' WHERE entity_type = ? AND status = 1 AND (display_name LIKE ? OR email LIKE ? OR contact LIKE ?) ORDER BY display_name ASC LIMIT 10', 'ssss', [$type, $q, $q, $q]);
         while($row = $qry->fetch_assoc()){
             $data[] = array(
                 'id' => $row['id'],

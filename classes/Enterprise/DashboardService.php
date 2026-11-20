@@ -18,6 +18,7 @@ final class DashboardService extends Service {
         $lineFilter=$location?' AND location_id=?':'';
         $profit=$this->row('SELECT COALESCE(SUM(revenue),0) AS revenue,COALESCE(SUM(cogs),0) AS cogs FROM erp_operational_lines WHERE transaction_date BETWEEN ? AND ?'.$lineFilter,$values);
         $metrics['sales']=Money::decimal($profit['revenue']);$metrics['cogs']=Money::decimal($profit['cogs']);
+        if(CatalogService::available($this->db))$metrics['expenses']=Money::decimal($this->row('SELECT COALESCE(SUM(amount),0) AS amount FROM erp_operational_expenses WHERE transaction_date BETWEEN ? AND ?'.$lineFilter,$values)['amount']);
         $metrics['gross_profit']=Money::subtract($metrics['sales'],$metrics['cogs']);
         $metrics['net_profit']=Money::subtract($metrics['gross_profit'],$metrics['expenses']);
         $reports=new ReportService($this->db,$this->user);
@@ -54,6 +55,10 @@ final class DashboardService extends Service {
         $payments=$this->rows("SELECT a.name,SUM(l.amount) AS amount FROM transaction_list l JOIN transactions t ON t.id=l.ref_id AND l.ref_table='transactions' JOIN account_list a ON a.id=l.account_id WHERE t.type='payment' AND l.type=1 AND t.transaction_date BETWEEN ? AND ? GROUP BY a.id,a.name ORDER BY amount DESC",[$from,$to]);
         $monthValues=[$to,$to];if($location)$monthValues[]=$location;
         $monthly=$this->rows("SELECT DATE_FORMAT(t.transaction_date,'%Y-%m') AS month,SUM(IF(t.type='sale',t.total_amount,0)) AS sales,SUM(IF(t.type='purchase',t.total_amount,0)) AS purchases,SUM(IF(t.type='expense',t.total_amount,0)) AS expenses FROM transactions t LEFT JOIN erp_transaction_context c ON c.transaction_id=t.id WHERE t.transaction_date BETWEEN DATE_SUB(?,INTERVAL 5 MONTH) AND ?".$filter." GROUP BY DATE_FORMAT(t.transaction_date,'%Y-%m') ORDER BY month",$monthValues);
+        if(CatalogService::available($this->db)){
+            $monthlyExpenses=array_column($this->rows("SELECT DATE_FORMAT(transaction_date,'%Y-%m') AS month,SUM(amount) AS expenses FROM erp_operational_expenses WHERE transaction_date BETWEEN DATE_SUB(?,INTERVAL 5 MONTH) AND ?".($location?' AND location_id=?':'')." GROUP BY DATE_FORMAT(transaction_date,'%Y-%m')",$monthValues),'expenses','month');
+            foreach($monthly as &$month)$month['expenses']=$monthlyExpenses[$month['month']]??'0.00';unset($month);
+        }
         $parties=$this->rows("SELECT entity_type AS type,COUNT(*) AS total,SUM(status=1) AS active FROM entity_list WHERE entity_type IN ('Customer','Supplier') GROUP BY entity_type");
         return ['from'=>$from,'to'=>$to,'location_id'=>$location,'metrics'=>$metrics,'accounts'=>$accounts,'cash'=>$cash,'trend'=>$trend,
             'low_stock'=>array_slice($low,0,10),'top_items'=>array_slice($top,0,10),

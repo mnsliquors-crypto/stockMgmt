@@ -25,7 +25,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
                 <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=transactions/expenses/manage_expense"><i class="fas fa-money-check-alt mr-2 text-success"></i> Expense</a>
                 <div class="dropdown-divider"></div>
                 <h6 class="dropdown-header text-uppercase font-weight-bold" style="font-size:0.7rem; letter-spacing:0.5px; color:#888;">Master records</h6>
-                <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=master/items/manage"><i class="fas fa-box mr-2 text-secondary"></i> Item</a>
+                <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=<?php echo !empty($item_catalog_available)?'enterprise/catalog&amp;new=1':'master/items/manage' ?>"><i class="fas fa-box mr-2 text-secondary"></i> Item</a>
                 <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=master/customers/manage"><i class="fas fa-users mr-2 text-secondary"></i> Customer</a>
                 <a class="dropdown-item py-2" href="<?php echo base_url ?>admin/?page=master/vendors/manage"><i class="fas fa-truck mr-2 text-secondary"></i> Vendor</a>
             </div>
@@ -77,6 +77,10 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
                 <a href="<?php echo base_url ?>admin/?page=sales" class="ns-dropdown-link">Sales & Invoices</a>
                 <a href="<?php echo base_url ?>admin/?page=purchases" class="ns-dropdown-link">Purchases</a>
                 <a href="<?php echo base_url ?>admin/?page=transactions/procurement" class="ns-dropdown-link">Purchase Orders &amp; Receiving</a>
+                <?php if(!empty($purchase_cycle_available)): ?>
+                <a href="<?php echo base_url ?>admin/?page=transactions/item_receipts" class="ns-dropdown-link">Item Receipts</a>
+                <a href="<?php echo base_url ?>admin/?page=transactions/vendor_bills" class="ns-dropdown-link">Supplier Bills</a>
+                <?php endif ?>
                 <a href="<?php echo base_url ?>admin/?page=payments" class="ns-dropdown-link">Payments</a>
                 <?php if(!empty($enterprise_available)): ?><a href="<?php echo base_url ?>admin/?page=enterprise/credits" class="ns-dropdown-link">Customer &amp; Supplier Credits</a><?php endif ?>
                 <a href="<?php echo base_url ?>admin/?page=expenses" class="ns-dropdown-link">Business Expenses</a>
@@ -91,7 +95,8 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
         <li class="ns-menu-item <?php echo strpos($page, 'master/') !== false ? 'active' : '' ?>">
             <a href="#" class="ns-menu-link">Lists <i class="fas fa-chevron-down ml-2" style="font-size: 0.6rem;"></i></a>
             <div class="ns-dropdown">
-                <a href="<?php echo base_url ?>admin/?page=master/items" class="ns-dropdown-link">Items & Inventory</a>
+                <a href="<?php echo base_url ?>admin/?page=<?php echo !empty($item_catalog_available)?'enterprise/catalog':'master/items' ?>" class="ns-dropdown-link">Items &amp; Inventory</a>
+                <?php if(!empty($item_catalog_available)): ?><a href="<?php echo base_url ?>admin/?page=enterprise/catalog&amp;view=units" class="ns-dropdown-link">Units, Bins &amp; Classifications</a><?php endif ?>
                 <a href="<?php echo base_url ?>admin/?page=master/categories" class="ns-dropdown-link">Categories</a>
                 <a href="<?php echo base_url ?>admin/?page=master/stocks" class="ns-dropdown-link">Stock Registry</a>
                 <?php if(!empty($enterprise_available)): ?><a href="<?php echo base_url ?>admin/?page=enterprise/inventory" class="ns-dropdown-link">Locations, Transfers &amp; Packaging</a><a href="<?php echo base_url ?>admin/?page=enterprise/promotions" class="ns-dropdown-link">Promotions</a><a href="<?php echo base_url ?>admin/?page=enterprise/activities" class="ns-dropdown-link">Activities</a><?php endif ?>
@@ -193,7 +198,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 </nav>
 
 <!-- Contextual Page Header (NetSuite Style Title Bar) -->
-<?php if($page!=='home'&&!str_starts_with($page,'enterprise/')&&!str_starts_with($page,'finance/accounting')&&!str_starts_with($page,'transactions/procurement')): ?>
+<?php if($page!=='home'&&!str_starts_with($page,'enterprise/')&&!str_starts_with($page,'finance/accounting')&&!str_starts_with($page,'transactions/procurement')&&!str_starts_with($page,'transactions/item_receipts')&&!str_starts_with($page,'transactions/vendor_bills')): ?>
 <div class="ns-page-header">
     <div class="left-ctx">
         <h1 class="ns-page-title"><?php echo ucwords(str_replace(['_', '/'], [' ', ' &bull; '], $page)) ?></h1>

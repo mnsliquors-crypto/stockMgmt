@@ -66,7 +66,7 @@ if(isset($_GET['item_id'])){
                             <select name="vendor_id" id="vendor_id" class="custom-select select2">
                                 <option <?php echo !isset($vendor_id) ? 'selected' : '' ?> disabled></option>
                                 <?php 
-                                $vendor = $conn->query("SELECT *, display_name as name FROM `entity_list` WHERE entity_type = 'Supplier' AND status = 1 ORDER BY `display_name` ASC");
+                                $vendor = $conn->query("SELECT *, display_name as name FROM `{$purchasable_party_source}` WHERE entity_type = 'Supplier' AND status = 1 ORDER BY `display_name` ASC");
                                 while($row = $vendor->fetch_assoc()):
                                 ?>
                                 <option value="<?php echo $row['id'] ?>" <?php echo isset($vendor_id) && $vendor_id == $row['id'] ? "selected" : "" ?>><?php echo htmlspecialchars($row['name']) ?></option>
@@ -81,7 +81,7 @@ if(isset($_GET['item_id'])){
                     <div class="row justify-content-center align-items-end">
                         <?php 
                             $item_arr = array();
-                            $item_qry = $conn->query("SELECT i.*, c.name as category, i.quantity as stock FROM `item_list` i LEFT JOIN category_list c ON i.category_id = c.id WHERE i.status = 1 ORDER BY i.name ASC");
+                            $item_qry = $conn->query("SELECT i.*, c.name as category, i.quantity as stock FROM `{$purchasable_item_source}` i LEFT JOIN category_list c ON i.category_id = c.id WHERE i.status = 1 ORDER BY i.name ASC");
                             while($row = $item_qry->fetch_assoc()){
                                 $item_arr[$row['id']] = $row;
                             }
