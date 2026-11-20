@@ -4,7 +4,8 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 <!-- NetSuite Layer 1: Branding & Profile -->
 <div class="erp-header-top">
     <div class="ns-logo">
-        <img src="<?php echo validate_image($_settings->info('logo')) ?>" alt="Logo">
+        <?php $brandLogo=validate_image($_settings->info('logo'));if(!empty($enterprise_available)&&str_contains($brandLogo,'no-image-available'))$brandLogo=base_url.'dist/img/mns-liquors-logo.jpg'; ?>
+        <img src="<?php echo htmlspecialchars($brandLogo,ENT_QUOTES,'UTF-8') ?>" alt="MNS Liquors logo">
         <span>MNS LIQUORS</span>
     </div>
 
@@ -37,8 +38,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 
     <div class="header-right d-flex align-items-center" style="gap: 1.5rem;">
         <div class="action-icons d-flex align-items-center" style="gap: 1rem; color: #666; font-size: 1rem;">
-            <i class="far fa-bell cursor-pointer" title="Notifications"></i>
-            <i class="far fa-question-circle cursor-pointer" title="Help"></i>
+            <?php if(!empty($enterprise_available)): ?><a href="<?php echo base_url ?>admin/?page=enterprise/activities&view=calendar" class="text-muted" title="Activities and reminders" aria-label="Activities and reminders"><i class="far fa-bell"></i></a><a href="<?php echo base_url ?>admin/?page=enterprise/assistant" class="text-muted" title="Draft assistant" aria-label="Draft assistant"><i class="fas fa-magic"></i></a><?php endif ?>
         </div>
         
         <div class="dropdown">
@@ -74,13 +74,15 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
         </li>
 
         <!-- Transactions -->
-        <li class="ns-menu-item <?php echo strpos($page, 'transactions/') !== false ? 'active' : '' ?>">
+        <li class="ns-menu-item <?php echo strpos($page, 'transactions/') !== false && !str_contains($page, 'transactions/procurement') ? 'active' : '' ?>">
             <a href="#" class="ns-menu-link">Transactions <i class="fas fa-chevron-down ml-2" style="font-size: 0.6rem;"></i></a>
             <div class="ns-dropdown">
                 <a href="<?php echo base_url ?>admin/?page=pos" class="ns-dropdown-link font-weight-bold text-success"><i class="fas fa-cash-register mr-1"></i> POS Entry Form</a>
                 <a href="<?php echo base_url ?>admin/?page=sales" class="ns-dropdown-link">Sales & Invoices</a>
                 <a href="<?php echo base_url ?>admin/?page=purchases" class="ns-dropdown-link">Purchases</a>
+                <a href="<?php echo base_url ?>admin/?page=transactions/procurement" class="ns-dropdown-link">Purchase Orders &amp; Receiving</a>
                 <a href="<?php echo base_url ?>admin/?page=payments" class="ns-dropdown-link">Payments</a>
+                <?php if(!empty($enterprise_available)): ?><a href="<?php echo base_url ?>admin/?page=enterprise/credits" class="ns-dropdown-link">Customer &amp; Supplier Credits</a><?php endif ?>
                 <a href="<?php echo base_url ?>admin/?page=expenses" class="ns-dropdown-link">Business Expenses</a>
                 <a href="<?php echo base_url ?>admin/?page=master/accounts/transfers" class="ns-dropdown-link">Fund Transfers</a>
                 <div class="dropdown-divider"></div>
@@ -96,6 +98,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
                 <a href="<?php echo base_url ?>admin/?page=master/items" class="ns-dropdown-link">Items & Inventory</a>
                 <a href="<?php echo base_url ?>admin/?page=master/categories" class="ns-dropdown-link">Categories</a>
                 <a href="<?php echo base_url ?>admin/?page=master/stocks" class="ns-dropdown-link">Stock Registry</a>
+                <?php if(!empty($enterprise_available)): ?><a href="<?php echo base_url ?>admin/?page=enterprise/inventory" class="ns-dropdown-link">Locations, Transfers &amp; Packaging</a><a href="<?php echo base_url ?>admin/?page=enterprise/promotions" class="ns-dropdown-link">Promotions</a><a href="<?php echo base_url ?>admin/?page=enterprise/activities" class="ns-dropdown-link">Activities</a><?php endif ?>
                 <div class="dropdown-divider"></div>
                 <a href="<?php echo base_url ?>admin/?page=master/customers" class="ns-dropdown-link">Customers</a>
                 <a href="<?php echo base_url ?>admin/?page=master/vendors" class="ns-dropdown-link">Vendors</a>
@@ -107,11 +110,15 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
         <li class="ns-menu-item <?php echo str_contains($page, 'finance/accounting') ? 'active' : '' ?>">
             <a href="<?php echo base_url ?>admin/?page=finance/accounting" class="ns-menu-link">Accounting</a>
         </li>
+        <li class="ns-menu-item <?php echo str_contains($page, 'transactions/procurement') ? 'active' : '' ?>">
+            <a href="<?php echo base_url ?>admin/?page=transactions/procurement" class="ns-menu-link">Purchasing</a>
+        </li>
 
         <!-- Reports (2-layer flyout) -->
         <li class="ns-menu-item <?php echo strpos($page, 'reports/') !== false ? 'active' : '' ?>">
             <a href="#" class="ns-menu-link">Reports <i class="fas fa-chevron-down ml-2" style="font-size: 0.6rem;"></i></a>
             <div class="ns-dropdown ns-dropdown-2layer" style="min-width: 240px;">
+                <?php if(!empty($enterprise_available)): ?><a href="<?php echo base_url ?>admin/?page=enterprise/reports" class="ns-dropdown-link font-weight-bold"><i class="fas fa-th mr-2"></i> Report Center</a><a href="<?php echo base_url ?>admin/?page=enterprise/receipts" class="ns-dropdown-link">Individual POS Receipts</a><div class="dropdown-divider"></div><?php endif ?>
 
                 <!-- Layer 1 item → Layer 2 flyout -->
                 <div class="ns-has-sub">
@@ -178,6 +185,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
             <a href="#" class="ns-menu-link">Setup <i class="fas fa-chevron-down ml-2" style="font-size: 0.6rem;"></i></a>
             <div class="ns-dropdown">
                 <a href="<?php echo base_url ?>admin/?page=system/users" class="ns-dropdown-link">User Management</a>
+                <?php if(!empty($enterprise_available)): ?><a href="<?php echo base_url ?>admin/?page=enterprise/roles" class="ns-dropdown-link">Access Roles</a><a href="<?php echo base_url ?>admin/?page=enterprise/fiscal_years" class="ns-dropdown-link">Fiscal Years</a><a href="<?php echo base_url ?>admin/?page=enterprise/health" class="ns-dropdown-link">System Integrity</a><?php endif ?>
                 <a href="<?php echo base_url ?>admin/?page=system/settings" class="ns-dropdown-link">Company Information</a>
                 <a href="<?php echo base_url ?>admin/?page=transactions/opening_balances" class="ns-dropdown-link">Opening Balances</a>
                 <a href="<?php echo base_url ?>admin/?page=system/settings/ref_codes" class="ns-dropdown-link">Reference Codes</a>
@@ -203,6 +211,23 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 
 <script>
 $(document).ready(function(){
+    <?php if(!empty($enterprise_available)):
+        $navPermissions=[];foreach(array_unique(array_values(App\Enterprise\Access::PAGE_SCOPES)) as $scope)$navPermissions[$scope]=['read'=>App\Enterprise\Access::allowed($conn,(int)$_settings->userdata('id'),$scope),'write'=>App\Enterprise\Access::allowed($conn,(int)$_settings->userdata('id'),$scope,true)];
+    ?>
+    const navPermissions=<?php echo json_encode($navPermissions) ?>,routeScopes=<?php echo json_encode(App\Enterprise\Access::PAGE_SCOPES) ?>,navAdmin=<?php echo (int)$_settings->userdata('type')===1?'true':'false' ?>;
+    $('.erp-header-top a,.erp-nav-bar a,.suite-shortcuts a').each(function(){
+        const url=new URL(this.href,location.href);if(url.origin!==location.origin||this.getAttribute('href')==='#')return;
+        const page=url.searchParams.get('page')||(url.pathname.replace(/\/$/,'')===new URL(_base_url_+'admin').pathname?'home':null);if(!page)return;
+        if(page.startsWith('system/')&&page!=='system/users/profile'&&!navAdmin){this.remove();return;}
+        const entry=Object.entries(routeScopes).find(([prefix])=>page===prefix||page.startsWith(prefix.replace(/\/$/,'')+'/'));
+        const creating=!!this.closest('[aria-labelledby="globalCreateNew"]');
+        if(entry&&!navPermissions[entry[1]][creating?'write':'read'])this.remove();
+    });
+    $('.ns-has-sub').each(function(){if(!this.querySelector('.ns-sub-dropdown a'))this.remove();});
+    $('.ns-menu-item').each(function(){const menu=this.querySelector('.ns-dropdown');if(!this.querySelector('a')||(menu&&!menu.querySelector('a')))this.remove();});
+    const createMenu=document.querySelector('[aria-labelledby="globalCreateNew"]');if(createMenu&&!createMenu.querySelector('a'))createMenu.closest('.dropdown').remove();
+    if(!['inventory','sales','purchases','payments','reports'].every(scope=>navPermissions[scope].read))$('#ns-global-search').closest('div').hide();
+    <?php endif ?>
     var searchInput = $('#ns-global-search');
     var resultsBox = $('#ns-search-results');
     var timer = null;
@@ -210,8 +235,7 @@ $(document).ready(function(){
 
     // Load Search History
     function getSearchHistory() {
-        var history = localStorage.getItem('erp_search_history');
-        return history ? JSON.parse(history) : [];
+        try {const history=JSON.parse(localStorage.getItem('erp_search_history')||'[]');return Array.isArray(history)?history.filter(term=>typeof term==='string').slice(0,5):[];}catch(error){return [];}
     }
 
     function saveToHistory(term) {
@@ -225,11 +249,11 @@ $(document).ready(function(){
         var history = getSearchHistory();
         if (history.length === 0) return;
         
-        var html = '<div class="ns-search-group-header ns-search-history-header">Recent Searches <span class="ns-search-clear-history">Clear</span></div>';
+        resultsBox.empty().append('<div class="ns-search-group-header ns-search-history-header">Recent Searches <span class="ns-search-clear-history">Clear</span></div>');
         history.forEach(function(term){
-            html += '<div class="ns-search-item history-item" data-term="'+term+'"><i class="fas fa-history text-muted mr-3"></i><span>'+term+'</span></div>';
+            resultsBox.append($('<div class="ns-search-item history-item">').data('term',term).append('<i class="fas fa-history text-muted mr-3"></i>',$('<span>').text(term)));
         });
-        resultsBox.html(html).show();
+        resultsBox.show();
     }
 
     searchInput.on('focus', function(){
@@ -245,6 +269,7 @@ $(document).ready(function(){
     $(document).on('click', '.history-item', function(){
         searchInput.val($(this).data('term')).trigger('keyup');
     });
+    $(document).on('click','.ns-search-item[data-result-url]',function(){handleResultClick($(this).data('result-url'),$(this).data('query'));});
 
     searchInput.on('keyup', function(e){
         var items = $('.ns-search-item');
@@ -291,11 +316,11 @@ $(document).ready(function(){
                 dataType: 'json',
                 success: function(groups){
                     if (Object.keys(groups).length === 0) {
-                        resultsBox.html('<div class="p-4 text-center text-muted">No records found matching "<b>'+q+'</b>"</div>');
+                        resultsBox.empty().append($('<div class="p-4 text-center text-muted">').text('No records found matching "'+q+'"'));
                         return;
                     }
                     
-                    var html = '';
+                    resultsBox.empty();
                     var iconMap = {
                         'customers': 'fa-user-tie text-navy',
                         'vendors': 'fa-truck text-orange',
@@ -306,7 +331,7 @@ $(document).ready(function(){
                     };
 
                     for (var group in groups) {
-                        html += '<div class="ns-search-group-header">' + group.replace('_', ' ') + '</div>';
+                        resultsBox.append($('<div class="ns-search-group-header">').text(group.replace('_', ' ')));
                         groups[group].forEach(function(item){
                             var icon = iconMap[group] || 'fa-file-alt text-secondary';
                             if (group === 'transactions') {
@@ -318,17 +343,15 @@ $(document).ready(function(){
 
                             var viewUrl = '<?php echo base_url ?>admin/?page=' + item.view_url;
                             
-                            html += '<div class="ns-search-item" onclick="handleResultClick(\''+viewUrl+'\', \''+q+'\')">' +
-                                        '<div class="mr-3 text-center"><i class="fas '+icon+'"></i></div>' +
-                                        '<div class="flex-grow-1">' +
-                                            '<div class="font-weight-bold mb-0" style="color: #333;">' + item.title_highlighted + '</div>' +
-                                            '<div class="text-muted" style="font-size: 0.72rem;">' + item.subtitle_highlighted + '</div>' +
-                                        '</div>' +
-                                        (item.amount > 0 ? '<div class="font-weight-bold text-dark ml-2">Rs.' + parseFloat(item.amount).toLocaleString(undefined, {minimumFractionDigits: 2}) + '</div>' : '') +
-                                    '</div>';
+                            const result=$('<div class="ns-search-item" data-result-url>')
+                                .data('result-url',viewUrl).data('query',q)
+                                .append($('<div class="mr-3 text-center">').append($('<i>').addClass('fas '+icon)),
+                                    $('<div class="flex-grow-1">').append($('<div class="font-weight-bold mb-0">').html(item.title_highlighted),$('<div class="text-muted small">').html(item.subtitle_highlighted)));
+                            if(item.amount>0)result.append($('<div class="font-weight-bold text-dark ml-2">').text('Rs.'+Number(item.amount).toLocaleString(undefined,{minimumFractionDigits:2})));
+                            resultsBox.append(result);
                         });
                     }
-                    resultsBox.html(html);
+                    resultsBox.show();
                     activeIndex = -1;
                 }
             });
@@ -360,8 +383,8 @@ $(document).ready(function(){
 });
 
 function handleResultClick(url, q) {
-    var history = localStorage.getItem('erp_search_history');
-    var historyArr = history ? JSON.parse(history) : [];
+    var historyArr=[];
+    try {const history=JSON.parse(localStorage.getItem('erp_search_history')||'[]');if(Array.isArray(history))historyArr=history.filter(term=>typeof term==='string');}catch(error){}
     historyArr = historyArr.filter(h => h !== q);
     historyArr.unshift(q);
     localStorage.setItem('erp_search_history', JSON.stringify(historyArr.slice(0, 5)));

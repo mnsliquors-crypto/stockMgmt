@@ -1,0 +1,39 @@
+.procurement-workspace { min-width: 0; }
+.po-print-brand, .po-print-document { display: none; }
+.procurement-workspace .nav-tabs { flex-wrap: wrap; }
+.procurement-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.procurement-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.procurement-workspace th { white-space: nowrap; }
+.procurement-workspace td { vertical-align: middle; overflow-wrap: anywhere; }
+.procurement-workspace input[type="checkbox"] { width: 16px; height: 16px; vertical-align: middle; }
+.procurement-workspace .po-item-column { min-width: 260px; width: 43%; }
+.procurement-workspace .po-quantity-column { min-width: 120px; width: 120px; }
+.procurement-workspace .po-money-column { min-width: 130px; width: 150px; }
+.procurement-workspace .po-action-column { width: 40px; min-width: 40px; }
+.procurement-workspace .select2-container { max-width: 100%; width: 100% !important; }
+.po-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.po-totals dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.po-totals dt:last-of-type, .po-totals dd:last-of-type { border-top: 1px solid #d5dade; padding-top: 8px; font-weight: 700; }
+.procurement-workspace .form-control { max-width: 100%; }
+.procurement-workspace .table-responsive { overscroll-behavior-x: contain; }
+@media (max-width: 575px) {
+    .procurement-workspace h4 { font-size: 22px; }
+    .procurement-workspace h5 { font-size: 18px; overflow-wrap: anywhere; }
+    .procurement-workspace .nav-link { padding: 8px 10px; font-size: 14px; }
+}
+@media print {
+    html, body, .erp-wrapper { background: white !important; }
+    .procurement-workspace > :not(.po-print-brand):not(.po-print-document) { display: none !important; }
+    .po-print-document { display: block; }
+    .po-print-document td, .po-print-document th { white-space: normal; overflow-wrap: anywhere; }
+    .po-print-notes { white-space: pre-wrap; }
+    .erp-header-top, .erp-nav-bar, .ns-page-header, footer, .procurement-no-print,
+    #procurement-message, .po-order-operations, #po-receive-form input, #po-reason-modal { display: none !important; }
+    .po-print-brand { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .po-print-brand img { width: 64px; height: 64px; object-fit: contain; }
+    .po-print-brand h3 { font-size: 22px; margin-bottom: 4px; }
+    .erp-main, .content, .container-fluid, .procurement-workspace { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    .procurement-workspace .table-responsive { overflow: visible !important; }
+    .procurement-workspace input, .procurement-workspace select, .procurement-workspace textarea { color: #111 !important; background: white !important; border: 0 !important; }
+    .procurement-workspace tr { break-inside: avoid; }
+}

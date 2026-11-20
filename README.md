@@ -105,10 +105,10 @@ Additional periods can use custom dates and cannot overlap. Closing requires all
 business documents and journals in the period to be posted. Reversals can be
 dated in a later open period without altering an earlier closed period.
 
-The rest of the ERP roadmap is not implemented by this release: warehouse/bin
-stock, reservations, case/bottle conversions, purchase-order/receiving and sales
-fulfillment workflows, configurable approval routing, multi-company/currency,
-bank statement matching, and external integrations remain subsequent phases.
+The Purchasing release below adds purchase orders, receiving, replenishment, and
+single-step approval routing. Warehouse/bin stock, reservations, case/bottle
+conversions, sales fulfillment, multi-company/currency, bank statement matching,
+and external integrations remain subsequent phases.
 
 ### Accounting Verification
 
@@ -136,3 +136,98 @@ screens and endpoints.
 existing Chrome debugging endpoint on port 9223. It verifies draft creation,
 posting, reversal, financial reports, and desktop/mobile layout without adding
 browser packages. Screenshots are written outside the repository.
+
+## ERP Purchasing Release
+
+Open **Purchasing** in the main navigation. This is a separate purchase-order
+workflow; existing purchase bills and historical records are preserved.
+
+- Draft orders with supplier, expected delivery, item quantities, prices, and tax.
+- Submission with a configurable amount threshold and designated administrator.
+  Orders at or above the threshold require approval by someone other than their
+  creator. The default threshold is zero, so all new orders require approval.
+- Administrators can reject orders with a reason or explicitly reassign a pending
+  approval to another independent administrator. Policy changes do not silently
+  approve or reroute orders already awaiting approval.
+- Partial receiving against approved quantities and prices. Each receipt creates
+  one supplier purchase bill and its inventory movements atomically, using the
+  approved prices. A receipt requires a supplier invoice number, unique per
+  supplier across this receiving workflow, and an open accounting period. Each
+  ordered line needs a positive price and a value of at least NPR 0.01;
+  zero-value promotional receipts are not supported in this release.
+- Duplicate-request protection, over-receipt prevention, and immutable receipts
+  and linked purchase bills, including before accounting posting. Corrections use
+  linked supplier returns; returning goods does not reopen the original order.
+- Cancel unreceived orders or close remaining quantities on partially received
+  orders with a reason, retaining the original terms and audit history.
+- Replenishment by supplier, including on-hand stock, remaining approved inbound
+  quantities, and draft/pending quantities. Selected shortages create an editable
+  draft order. Cancelled, rejected, and closed quantities are excluded.
+- Printable purchase orders, receipt history, search integration, CSV
+  replenishment export, and responsive desktop/mobile screens.
+
+Run `php database/migrate.php` to apply `002_procurement`. It only adds the
+purchasing schema and guards; it does not manufacture orders or receiving history
+from old purchase bills.
+
+**Approval Policy** also has an optional mandatory purchase-order setting. It is
+off initially to preserve existing direct purchase entry. Enable it to block
+direct purchase creation/edits through the old forms/API and purchase rows in
+transaction CSV imports. Opening-balance setup remains a separate cutover
+operation. Policy changes require an administrator, a reason, and are audited.
+Use named administrator accounts for independent approvals, not a shared login.
+
+Receiving in this release combines goods receipt and supplier bill entry; it is
+not a separate uninvoiced-receipts/three-way-invoice-matching system. Bill payment
+and journal posting use the existing Payments and Accounting screens. Receipts
+update the existing aggregate stock ledger; after migration 003, they also retain
+the order's selected location and frozen case conversions. The current
+historical inward-weighted cost method is retained; FIFO, landed cost, and stock
+reservations have not been added. Legacy purchase bills do not participate in the
+new supplier-invoice uniqueness index.
+
+### Purchasing Verification
+
+Use the same fresh disposable `_test` database and test server described above.
+Run `tests/accounting.php` **before** the procurement suites, because its opening
+trial-balance assertions require an otherwise empty posted general ledger.
+
+```sh
+php tests/accounting.php
+php tests/regression.php
+php tests/accounting_pos.php
+php tests/accounting_settlements.php
+php tests/procurement.php
+APP_BASE_URL=http://127.0.0.1:8081/ php tests/http.php
+APP_BASE_URL=http://127.0.0.1:8081/ php tests/procurement_http.php
+```
+
+Procurement checks cover money/quantity precision, permissions, self-approval,
+policy snapshots/reassignment, stale edits, receipt rollback, partial-delivery
+rounding, supplier invoice uniqueness, immutable records, accounting integration,
+replenishment, and two independent processes racing one receipt. HTTP checks also
+exercise the old purchase endpoint and CSV import under mandatory-PO policy.
+
+After those suites, `tests/browser_procurement.mjs` can use the installed Chrome
+debugging endpoint on port 9223. It creates an order, uses an independent checker,
+receives two deliveries as staff, rejects a duplicate invoice, and checks print,
+item controls, navigation, and desktop/mobile layout. Its browser users exist only
+in the disposable database. No additional packages are required.
+
+## Friend-Version Feature Merge
+
+Migration `003_friend_features` adds an executive dashboard with saved preferences,
+location stock and transfers, case packaging/barcodes, scheduled promotions,
+individual POS receipts, activities/calendar, custom roles, fiscal-year controls,
+return-credit allocation, local draft interpretation, and a searchable 54-report
+center. Statements support editable WhatsApp drafts; no messages send automatically.
+The existing installed frontend libraries are reused without package downloads.
+
+Legacy stock defaults to Main Store. Existing documents are neither imported from
+the archive nor automatically posted/revalued. Posted-ledger financial reports
+remain distinct from operational reports. Keep the private pre-upgrade backup.
+
+See [the comparison and delivery notes](docs/FRIEND_VERSION_MERGE.md) for test
+commands, exact adaptations, and deliberate exclusions. These include unsafe
+archive password resets/SQL restore, unverified payment QR details, provider-based
+automatic messaging, standalone non-return credits, and mixed per-line VAT.

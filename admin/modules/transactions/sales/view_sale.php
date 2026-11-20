@@ -16,9 +16,10 @@ if(isset($_GET['id'])){
 
 // Calculate payment and return details
 $total_paid = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as paid FROM `transactions` WHERE parent_id = '{$id}' AND type = 'payment'")->fetch_assoc()['paid'] ?? 0;
-$total_returned = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as returned FROM `transactions` WHERE parent_id = '{$id}' AND type = 'return'")->fetch_assoc()['returned'] ?? 0;
+$total_returned = $conn->query("SELECT COALESCE(SUM(total_amount+tax), 0) as returned FROM `transactions` WHERE parent_id = '{$id}' AND type = 'return'")->fetch_assoc()['returned'] ?? 0;
+$total_returned=bcsub((string)$total_returned,App\Enterprise\Settlement::adjustment($conn,(int)$id),2);
 // Balance = Sale Amount - Total Paid - Total Returned
-$balance = floatval($amount) - floatval($total_paid) - floatval($total_returned);
+$balance = floatval($amount) + floatval($tax??0) - floatval($total_paid) - floatval($total_returned);
 // Determine status
 if($balance <= 0.01):
     $status_label = "Paid in Full";

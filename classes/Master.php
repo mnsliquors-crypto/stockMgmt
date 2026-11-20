@@ -1,10 +1,18 @@
 <?php
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/Accounting/Money.php';
+require_once __DIR__ . '/Inventory/StockService.php';
+require_once __DIR__ . '/Enterprise/LineService.php';
 Class Master extends DBConnection {
     private $settings;
     private $cache;
     private bool $accounting_enabled;
+    private bool $enterprise_enabled;
+    private array $enterprise_lines = [];
+    private array $enterprise_totals = [];
+    private ?string $checkoutRequestKey = null;
+    private string $checkoutRequestHash = '';
+    private array $checkoutOriginalInput = [];
     
     public function __construct(){
         global $_settings;
@@ -13,6 +21,7 @@ Class Master extends DBConnection {
         require_once __DIR__ . '/Cache.php';
         $this->cache = new Cache();
         $this->accounting_enabled = $this->conn->query("SHOW TABLES LIKE 'gl_journals'")->num_rows > 0;
+        $this->enterprise_enabled = $this->conn->query("SHOW TABLES LIKE 'erp_line_details'")->num_rows > 0;
     }
     
     public function clear_cache($key = null){
@@ -37,7 +46,23 @@ Class Master extends DBConnection {
         $row = $this->queryPrepared('SELECT * FROM transactions WHERE id = ? AND type = ? FOR UPDATE',
             'is', [(int)$id, $type])->fetch_assoc();
         if (!$row) throw new RuntimeException('Transaction not found or incorrect transaction type.');
+        if ($type==='sale'&&$this->enterprise_enabled&&$this->queryPrepared('SELECT id FROM erp_pos_checkouts WHERE sale_id=? LIMIT 1','i',[(int)$id])->num_rows) throw new RuntimeException('POS sales with counter receipts are locked. Correct them with linked returns.');
         return $row;
+    }
+
+    private function prepare_enterprise_lines(string $mode): void {
+        $this->enterprise_lines=[];$this->enterprise_totals=[];
+        if (!$this->enterprise_enabled) return;
+        $prepared=(new App\Enterprise\LineService($this->conn,(int)($this->settings->userdata('id')?:1)))->prepare($_POST,$mode);
+        $_POST=$prepared['input'];$this->enterprise_lines=$prepared['snapshots'];$this->enterprise_totals=$prepared['totals'];
+    }
+
+    private function enterprise_context(int $transaction, $location=null): void {
+        if ($this->enterprise_enabled) App\Enterprise\InventoryService::context($this->conn,$transaction,$location);
+    }
+
+    private function enterprise_snapshot(int $line, $index): void {
+        if (isset($this->enterprise_lines[$index])) App\Enterprise\LineService::snapshot($this->conn,$line,$this->enterprise_lines[$index]);
     }
 
     private function transaction_item_ids($id){
@@ -57,9 +82,35 @@ Class Master extends DBConnection {
                 || (float)$quantities[$key] < 1 || (float)$prices[$key] < 0) {
                 throw new InvalidArgumentException('Each item needs a valid quantity and a nonnegative price.');
             }
-            $totals[$key] = App\Accounting\Money::multiply($quantities[$key],$prices[$key]);
+            $totals[$key] = $this->enterprise_totals[$key] ?? App\Accounting\Money::multiply($quantities[$key],$prices[$key]);
         }
         return $totals;
+    }
+
+    private function validate_linked_return($parent_id, $return_id, $party_id, $party_type, $date, array $items, array $quantities, array $totals, $tax){
+        if (empty($parent_id)) return;
+        $parent = $this->queryPrepared('SELECT * FROM transactions WHERE id=? FOR UPDATE', 'i', [(int)$parent_id])->fetch_assoc();
+        $vendor_return = in_array(strtolower((string)$party_type), ['supplier','vendor'], true);
+        if (!$parent || !in_array($parent['type'], ['purchase','sale'], true) || (int)$parent['entity_id'] !== (int)$party_id
+            || ($parent['type'] === 'purchase') !== $vendor_return) {
+            throw new RuntimeException('A linked return must match its original invoice and party.');
+        }
+        if ($date < $parent['transaction_date']) throw new RuntimeException('A return cannot precede its original invoice.');
+        $original = $this->queryPrepared('SELECT item_id,SUM(quantity) AS quantity FROM transaction_items WHERE transaction_id=? GROUP BY item_id FOR UPDATE', 'i', [(int)$parent_id])->fetch_all(MYSQLI_ASSOC);
+        $original = array_column($original, 'quantity', 'item_id');
+        $returned = $this->queryPrepared("SELECT i.item_id,SUM(i.quantity) AS quantity FROM transaction_items i JOIN transactions t ON t.id=i.transaction_id WHERE t.type='return' AND t.parent_id=? AND t.id<>? GROUP BY i.item_id FOR UPDATE", 'ii', [(int)$parent_id,(int)$return_id])->fetch_all(MYSQLI_ASSOC);
+        $returned = array_column($returned, 'quantity', 'item_id');
+        foreach ($items as $key => $item) {
+            $returned[$item] = bcadd($returned[$item] ?? '0', App\Accounting\Money::decimal($quantities[$key], 4), 4);
+            if (!isset($original[$item]) || bccomp($returned[$item], $original[$item], 4) > 0) throw new RuntimeException('Returned quantity exceeds the original invoice.');
+        }
+        $prior = $this->queryPrepared("SELECT COALESCE(SUM(total_amount),0) AS amount,COALESCE(SUM(tax),0) AS tax FROM transactions WHERE type='return' AND parent_id=? AND id<>? FOR UPDATE", 'ii', [(int)$parent_id,(int)$return_id])->fetch_assoc();
+        $amount = '0.00';
+        foreach ($totals as $total) $amount = App\Accounting\Money::add($amount, $total);
+        if (App\Accounting\Money::compare(App\Accounting\Money::add($prior['amount'], $amount), $parent['total_amount']) > 0
+            || App\Accounting\Money::compare(App\Accounting\Money::add($prior['tax'], $tax), $parent['tax']) > 0) {
+            throw new RuntimeException('Return credit exceeds the original invoice amount or tax.');
+        }
     }
     
     // ==================== VENDOR FUNCTIONS ====================
@@ -479,27 +530,7 @@ Class Master extends DBConnection {
 
     public function update_item_stock($item_id){
         if(empty($item_id)) return false;
-        $item_id = intval($item_id);
-        
-        $stmt = $this->conn->prepare("
-            SELECT COALESCE(SUM(CASE 
-                WHEN t.type IN ('purchase', 'opening_stock', 'adjustment') THEN ti.quantity 
-                WHEN t.type = 'sale' THEN -ti.quantity 
-                WHEN t.type = 'return' THEN (CASE WHEN LOWER(t.entity_type) IN ('vendor', 'supplier') THEN -ti.quantity ELSE ti.quantity END)
-                ELSE 0 END), 0) as available
-            FROM transaction_items ti 
-            JOIN transactions t ON ti.transaction_id = t.id 
-            WHERE ti.item_id = ?
-        ");
-        $stmt->bind_param("i", $item_id);
-        $stmt->execute();
-        $available = $stmt->get_result()->fetch_assoc()['available'] ?? 0;
-        $stmt->close();
-        
-        $upd = $this->conn->prepare("UPDATE item_list SET quantity = ? WHERE id = ?");
-        $upd->bind_param("di", $available, $item_id);
-        $upd->execute();
-        $upd->close();
+        $available = (new App\Inventory\StockService($this->conn))->quantity((int)$item_id);
         $this->clear_cache('dashboard');
         return $available;
     }
@@ -510,44 +541,17 @@ Class Master extends DBConnection {
      */
     public function update_item_cost($item_id){
         if(empty($item_id)) return false;
-        $item_id = intval($item_id);
-
-        $stmt = $this->conn->prepare("
-            SELECT SUM(ti.total_price) as total_val, SUM(ti.quantity) as total_qty 
-            FROM transaction_items ti 
-            JOIN transactions t ON ti.transaction_id = t.id 
-            WHERE ti.item_id = ? 
-            AND (
-                t.type IN ('purchase', 'opening_stock') 
-                OR (t.type = 'adjustment' AND ti.quantity > 0)
-            )
-            AND ti.unit_price > 0
-        ");
-        $stmt->bind_param("i", $item_id);
-        $stmt->execute();
-        $res = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-
-        if($res){
-            $total_val = floatval($res['total_val']);
-            $total_qty = floatval($res['total_qty']);
-            
-            if($total_qty > 0){
-                $avg_cost = $total_val / $total_qty;
-                $upd = $this->conn->prepare("UPDATE item_list SET cost = ?, average_cost = ? WHERE id = ?");
-                $upd->bind_param("ddi", $avg_cost, $avg_cost, $item_id);
-                $upd->execute();
-                $upd->close();
-                $this->clear_cache('dashboard');
-                return $avg_cost;
-            }
-        }
-        $this->queryPrepared('UPDATE item_list SET cost = opening_cost, average_cost = opening_cost WHERE id = ?', 'i', [$item_id]);
-        return false;
+        $cost = (new App\Inventory\StockService($this->conn))->cost((int)$item_id);
+        $this->clear_cache('dashboard');
+        return $cost;
     }
     
     // ==================== PURCHASE FUNCTIONS ====================
     function save_purchase(){
+        if ($this->conn->query("SHOW TABLES LIKE 'po_policy'")->num_rows
+            && (int)$this->conn->query('SELECT require_purchase_orders FROM po_policy WHERE id=1')->fetch_assoc()['require_purchase_orders'] === 1) {
+            return json_encode(['status'=>'failed','msg'=>'Purchase orders are required. Create an order in Purchasing and receive the approved goods there.']);
+        }
         if(empty($_POST['id'])){
             $date = $_POST['date_po'] ?? ($_POST['date_created'] ?? date('Y-m-d'));
             $code = $this->generate_reference_code('purchase', $date);
@@ -559,6 +563,7 @@ Class Master extends DBConnection {
         
         extract($_POST);
         try {
+            $this->prepare_enterprise_lines('purchase'); extract($_POST);
             $total = $this->line_totals($item_id ?? null, $qty ?? null, $price ?? null);
         } catch (InvalidArgumentException $e) {
             return json_encode(['status' => 'failed', 'msg' => $e->getMessage()]);
@@ -647,6 +652,7 @@ Class Master extends DBConnection {
             if(!$stmt->execute()) throw new Exception($this->conn->error);
             $po_id = empty($id) ? $this->conn->insert_id : $id;
             $stmt->close();
+            $this->enterprise_context((int)$po_id,$_POST['location_id']??null);
 
             // Delete old po_items (now transaction_items)
             if(!empty($id)){
@@ -666,6 +672,7 @@ Class Master extends DBConnection {
                 // Save PO Item
                 $po_item_stmt->bind_param("iiddd", $po_id, $v, $p_qty, $p_price, $p_total);
                 $po_item_stmt->execute();
+                $this->enterprise_snapshot((int)$this->conn->insert_id,$k);
             }
             $po_item_stmt->close();
 
@@ -789,8 +796,19 @@ Class Master extends DBConnection {
     }
     // ==================== POS FUNCTIONS ====================
     function save_pos(){
+        $checkout_key=$this->enterprise_enabled?($_POST['checkout_request_key']??null):null;
+        $checkout_hash=hash('sha256',json_encode($_POST,JSON_THROW_ON_ERROR));
+        if ($checkout_key!==null) {
+            if (!is_string($checkout_key)||!preg_match('/^[A-Za-z0-9_-]{16,80}$/D',$checkout_key)) return json_encode(['status'=>'failed','msg'=>'Invalid checkout request key.']);
+            $existing=$this->queryPrepared('SELECT payload_hash,response FROM erp_pos_checkouts WHERE request_key=?','s',[$checkout_key])->fetch_assoc();
+            if ($existing) return hash_equals($existing['payload_hash'],$checkout_hash)?$existing['response']:json_encode(['status'=>'failed','msg'=>'Checkout request key already used with different data.']);
+        }
+        $this->checkoutRequestKey=$checkout_key;$this->checkoutRequestHash=$checkout_hash;
+        $this->checkoutOriginalInput=$_POST;
         extract($_POST);
         try {
+            $this->prepare_enterprise_lines('pos'); extract($_POST);
+            $checkout_key=$this->checkoutRequestKey;$checkout_hash=$this->checkoutRequestHash;unset($checkout_response);
             $total_price = $this->line_totals($item_id ?? null, $qty ?? null, $price ?? null);
         } catch (InvalidArgumentException $e) {
             return json_encode(['status' => 'failed', 'msg' => $e->getMessage()]);
@@ -870,12 +888,36 @@ Class Master extends DBConnection {
         // Update account_amount to reflect only the SALE portion for ledger entries below
         $account_amount = $actual_account_payments;
         $session_change = max(0, $total_tendered - $session_cart_total);
+        if ($checkout_key!==null&&$total_tendered+0.005<$session_cart_total) return json_encode(['status'=>'failed','msg'=>'Payment does not cover current cart prices. Refresh the cart and verify payment.']);
 
 
         $this->conn->begin_transaction();
         try {
+            if ($checkout_key!==null) {
+                $this->conn->query('SELECT id FROM erp_control WHERE id=1 FOR UPDATE');
+                $existing=$this->queryPrepared('SELECT payload_hash,response FROM erp_pos_checkouts WHERE request_key=? FOR UPDATE','s',[$checkout_key])->fetch_assoc();
+                if ($existing) {
+                    $this->conn->rollback();
+                    return hash_equals($existing['payload_hash'],$checkout_hash)?$existing['response']:json_encode(['status'=>'failed','msg'=>'Checkout request key already used with different data.']);
+                }
+                $needed=[];foreach($item_id as $key=>$item)$needed[(int)$item]=bcadd($needed[(int)$item]??'0',(string)$qty[$key],4);ksort($needed);
+                $inventory=new App\Enterprise\InventoryService($this->conn,(int)$user_id);
+                foreach($needed as $item=>$required){
+                    $this->queryPrepared('SELECT id FROM item_list WHERE id=? FOR UPDATE','i',[$item]);
+                    $available=$inventory->stock((int)($_POST['location_id']??1),$item)[0]??null;
+                    if(!$available||bccomp($available['quantity'],$required,4)<0)throw new RuntimeException('Insufficient stock for '.($available['name']??'item').'.');
+                }
+                $fresh=(new App\Enterprise\LineService($this->conn,(int)$user_id))->prepare($this->checkoutOriginalInput,'pos');
+                if($fresh['input']['qty']!==$qty||$fresh['input']['price']!==$price||$fresh['totals']!==$total_price)throw new RuntimeException('Item packaging or prices changed. Refresh the cart before completing this sale.');
+                $this->enterprise_lines=$fresh['snapshots'];
+            }
             // STEP 1: Find or Create Master Sale for this date AND customer
             $unposted_sale = $this->accounting_enabled ? " AND NOT EXISTS (SELECT 1 FROM gl_journals WHERE source_transaction_id=transactions.id AND status='posted')" : '';
+            if ($this->enterprise_enabled) {
+                $location_filter=filter_var($_POST['location_id']??1,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+                if (!$location_filter) throw new InvalidArgumentException('Invalid location.');
+                $unposted_sale.=' AND COALESCE((SELECT location_id FROM erp_transaction_context WHERE transaction_id=transactions.id),1)='.(int)$location_filter;
+            }
             $sale_stmt = $this->conn->prepare("SELECT id, reference_code, total_amount FROM `transactions` WHERE type='sale' AND DATE(transaction_date) = ? AND (entity_id = ? OR (entity_id IS NULL AND ? IS NULL)) AND remarks LIKE '%[POS]%' $unposted_sale LIMIT 1 FOR UPDATE");
             $sale_stmt->bind_param("sss", $pos_date, $customer_id, $customer_id);
             $sale_stmt->execute();
@@ -923,10 +965,12 @@ Class Master extends DBConnection {
                 $this->settings->audit_log('transactions', $sale_id, 'CREATE', [], $pos_new_data, 'POS Sales');
             }
             $sale_stmt->close();
+            $this->enterprise_context((int)$sale_id,$_POST['location_id']??null);
 
             // STEP 2: Insert or Update Sales Details
             if(isset($item_id) && is_array($item_id)){
-                $chk_item = $this->conn->prepare("SELECT id, quantity, total_price, cost_price, cost_recorded FROM `transaction_items` WHERE transaction_id = ? AND item_id = ?");
+                $append_checkout=$checkout_key!==null?' AND 1=0':'';
+                $chk_item = $this->conn->prepare("SELECT id, quantity, total_price, cost_price, cost_recorded FROM `transaction_items` WHERE transaction_id = ? AND item_id = ? $append_checkout");
                 $ins_item = $this->conn->prepare("INSERT INTO `transaction_items` (transaction_id, item_id, quantity, unit_price, mrp, total_price, cost_price, profit, cost_recorded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)");
                 $upd_item = $this->conn->prepare("UPDATE `transaction_items` SET quantity = ?, total_price = ?, unit_price = ?, mrp = ?, cost_price = ?, profit = ?, cost_recorded = 1 WHERE id = ?");
 
@@ -963,6 +1007,7 @@ Class Master extends DBConnection {
                         $row_profit = $row_total - $unit_cost * $sell_qty;
                         $ins_item->bind_param("iidddddd", $sale_id, $v, $sell_qty, $sell_price, $sell_mrp, $row_total, $unit_cost, $row_profit);
                         $ins_item->execute();
+                        $this->enterprise_snapshot((int)$this->conn->insert_id,$k);
                     }
 
                 }
@@ -1086,6 +1131,16 @@ Class Master extends DBConnection {
             $search_data = implode(' ', [$sales_code, "[POS] Consolidated Sales"]);
 
             $this->update_search_index('transactions', $sale_id, 'sale', $sales_code, 'Walk-in [POS]', $search_data, $new_total, $pos_date, "transactions/sales/view_sale&id=$sale_id", "transactions/sales/manage_sale&id=$sale_id");
+            if ($checkout_key!==null) {
+                $checkout_response=['status'=>'success','msg'=>'POS entry successfully saved.','sale_id'=>$sale_id,'receipt_key'=>$checkout_key,'change_due'=>App\Accounting\Money::decimal($session_change)];
+                $details=['items'=>[],'payments'=>$actual_account_payments,'tendered'=>App\Accounting\Money::decimal($total_tendered),'date'=>$pos_date];
+                foreach ($item_id as $k=>$v) {
+                    $product=$this->queryPrepared('SELECT name FROM item_list WHERE id=?','i',[$v])->fetch_assoc();
+                    $details['items'][]=array_merge($this->enterprise_lines[$k],['item_id'=>(int)$v,'name'=>$product['name'],'base_quantity'=>(string)$qty[$k],'amount'=>$total_price[$k]]);
+                }
+                $this->queryPrepared('INSERT INTO erp_pos_checkouts(request_key,payload_hash,sale_id,location_id,cashier_id,amount,details,response) VALUES (?,?,?,?,?,?,?,?)','ssiiisss',
+                    [$checkout_key,$checkout_hash,$sale_id,(int)($_POST['location_id']??1),$user_id,App\Accounting\Money::decimal($session_cart_total),json_encode($details,JSON_THROW_ON_ERROR),json_encode($checkout_response,JSON_THROW_ON_ERROR)]);
+            }
             
             $this->conn->commit();
             $this->clear_cache('dashboard');
@@ -1093,6 +1148,7 @@ Class Master extends DBConnection {
             $resp['status'] = 'success';
             $resp['msg'] = "POS entry successfully saved.";
             $resp['sale_id'] = $sale_id;
+            if (isset($checkout_response)) $resp=$checkout_response;
         } catch (Exception $e) {
             $this->conn->rollback();
             $resp['status'] = 'failed';
@@ -1114,6 +1170,7 @@ Class Master extends DBConnection {
         
         extract($_POST);
         try {
+            $this->prepare_enterprise_lines('sale'); extract($_POST);
             $total_price = $this->line_totals($item_id ?? null, $qty ?? null, $price ?? null);
         } catch (InvalidArgumentException $e) {
             return json_encode(['status' => 'failed', 'msg' => $e->getMessage()]);
@@ -1178,6 +1235,7 @@ Class Master extends DBConnection {
             if(!$stmt->execute()) throw new Exception($this->conn->error);
             $sale_id = empty($id) ? $this->conn->insert_id : $id;
             $stmt->close();
+            $this->enterprise_context((int)$sale_id,$_POST['location_id']??null);
 
             // Reverse transaction items
             if (!empty($id)) {
@@ -1200,6 +1258,7 @@ Class Master extends DBConnection {
 
                 $ti_stmt->bind_param("iiddddd", $sale_id, $v, $sell_qty, $sell_price, $row_total, $row_profit, $unit_cost);
                 if(!$ti_stmt->execute()) throw new Exception($this->conn->error);
+                $this->enterprise_snapshot((int)$this->conn->insert_id,$k);
             }
             $ti_stmt->close();
 
@@ -1322,121 +1381,36 @@ Class Master extends DBConnection {
     
     // ==================== PAYMENT FUNCTIONS ====================
     function save_payment(){
-        extract($_POST);
-        $user_id = $this->settings->userdata('id') ?: 1;
-        $ip = $_SERVER['REMOTE_ADDR'];
-
-        $this->conn->begin_transaction();
+        $original=$_POST;
         try {
-            // Basic validation
-            if(!isset($parent_id) || empty($parent_id)) throw new Exception("Parent record id is required.");
-            if(!isset($type)) throw new Exception("Payment type is required.");
-            // Get parent record to determine party and calculate outstanding
-            $p_stmt = $this->conn->prepare("SELECT total_amount, entity_id FROM transactions WHERE id = ?");
-            $p_stmt->bind_param("i", $parent_id);
-            $p_stmt->execute();
-            $parent = $p_stmt->get_result()->fetch_assoc();
-            $p_stmt->close();
-            if(!$parent) throw new Exception("Parent record not found.");
-            
-            $party_id = $parent['entity_id'] ?? 0;
-            
-            // Validate payment amount doesn't exceed balance
-            $total_amount = floatval($parent['total_amount']);
-            $ex_stmt = $this->conn->prepare("SELECT COALESCE(SUM(total_amount), 0) as paid FROM transactions WHERE parent_id = ? AND type = 'payment'");
-            $ex_stmt->bind_param("i", $parent_id);
-            $ex_stmt->execute();
-            $existing_paid = $ex_stmt->get_result()->fetch_assoc()['paid'] ?? 0;
-            $ex_stmt->close();
-            $current_balance = $total_amount - $existing_paid;
-            
-            $cash_amount = isset($cash_amount) ? floatval($cash_amount) : 0;
-            $qr_amount = isset($qr_amount) ? floatval($qr_amount) : 0;
-            $bank_amount = isset($bank_amount) ? floatval($bank_amount) : 0;
-            $total_payment = $cash_amount + $qr_amount + $bank_amount;
-            
-            if($total_payment > $current_balance + 0.01) {
-                throw new Exception("Payment amount ({$total_payment}) exceeds remaining balance ({$current_balance}).");
+            if (!empty($original['id'])) throw new InvalidArgumentException('Use the payment allocation form to edit existing payments.');
+            $parent=(int)($original['parent_id']??0);
+            $invoice=$this->queryPrepared("SELECT id,entity_id,type FROM transactions WHERE id=? AND type IN ('sale','purchase')",'i',[$parent])->fetch_assoc();
+            if (!$invoice||!$invoice['entity_id']) throw new InvalidArgumentException('Choose a customer invoice or supplier bill.');
+            $funds=[];$total='0.00';
+            foreach (['cash'=>['cash'],'qr'=>['qr','esewa'],'bank'=>['bank']] as $mode=>$names) {
+                $amount=App\Accounting\Money::decimal($original[$mode.'_amount']??'0');
+                if (App\Accounting\Money::compare($amount,'0')<0) throw new InvalidArgumentException('Payment amounts cannot be negative.');
+                if (App\Accounting\Money::compare($amount,'0')===0) continue;
+                $account=(int)($original[$mode.'_account_id']??0);
+                if (!$account) {
+                    $placeholders=implode(',',array_fill(0,count($names),'?'));
+                    $statement=$this->conn->prepare("SELECT id FROM account_list WHERE status=1 AND LOWER(name) IN ($placeholders) ORDER BY id LIMIT 1");
+                    $statement->execute($names);$account=(int)($statement->get_result()->fetch_assoc()['id']??0);
+                }
+                if (!$account||!$this->queryPrepared('SELECT id FROM account_list WHERE id=? AND status=1','i',[$account])->num_rows) throw new InvalidArgumentException('Select an active '.$mode.' payment account.');
+                $funds[$account]=App\Accounting\Money::add($funds[$account]??'0',$amount);
+                $total=App\Accounting\Money::add($total,$amount);
             }
-
-            // Determine payment method(s)
-            $payment_method = 'Mixed';
-            $cash_count = ($cash_amount > 0) ? 1 : 0;
-            $qr_count = ($qr_amount > 0) ? 1 : 0;
-            $bank_count = ($bank_amount > 0) ? 1 : 0;
-            $method_count = $cash_count + $qr_count + $bank_count;
-
-            if($method_count == 1){
-                if($cash_count) $payment_method = 'Cash';
-                elseif($qr_count) $payment_method = 'QR';
-                elseif($bank_count) $payment_method = 'Bank';
-            }
-
-            // Generate payment code (shared for parts)
-            $payment_code = $this->generate_reference_code('payment', date('Y-m-d'));
-            if(!$payment_code) throw new Exception("No active reference code setting for Payments.");
-            $remarks = $remarks ?? '';
-
-            // Insert payment(s) - create one row per non-zero method
-            $stmt = $this->conn->prepare("INSERT INTO `transactions` (`reference_code`, `parent_id`, `type`, `total_amount`, `payment_method`, `account_id`, `remarks`, `created_by`, `transaction_date`) VALUES (?, ?, 'payment', ?, ?, ?, ?, ?, NOW())");
-            if(!$stmt) throw new Exception('Failed to prepare payment insert statement: ' . $this->conn->error);
-
-            // helper to insert a payment part and update account balance
-            $insert_part = function($pstmt, $payment_code, $parent_id, $part_amount, $method_name, $remarks, $user_id, $master){
-                if($part_amount <= 0) return true;
-                $account_id = ($method_name == 'Cash') ? 1 : (($method_name == 'QR') ? 2 : 3);
-                if(!$pstmt->bind_param("sidsisi", $payment_code, $parent_id, $part_amount, $method_name, $account_id, $remarks, $user_id)) return $pstmt->error;
-                if(!$pstmt->execute()) return $pstmt->error;
-                
-                // update account balance
-                try{ $master->update_account_balance($account_id); } catch(Throwable $e){}
-                return true;
-            };
-
-            if($method_count == 1){
-                if($cash_count) $part_amount = $cash_amount;
-                elseif($qr_count) $part_amount = $qr_amount;
-                else $part_amount = $bank_amount;
-                $acc_id = ($payment_method == 'Cash') ? 1 : (($payment_method == 'QR') ? 2 : 3);
-                if(!$stmt->bind_param("sidsisi", $payment_code, $parent_id, $part_amount, $payment_method, $acc_id, $remarks, $user_id)) throw new Exception($this->conn->error);
-                if(!$stmt->execute()) throw new Exception($this->conn->error);
-                $first_id = $this->conn->insert_id;
-                $this->update_account_balance($acc_id);
-                $stmt->close();
-            } else {
-                $err = $insert_part($stmt, $payment_code, $parent_id, $cash_amount, 'Cash', $remarks, $user_id, $this);
-                if($err !== true) throw new Exception($err);
-                if(!isset($first_id)) $first_id = $this->conn->insert_id;
-                
-                $err = $insert_part($stmt, $payment_code, $parent_id, $qr_amount, 'QR', $remarks, $user_id, $this);
-                if($err !== true) throw new Exception($err);
-                if(!isset($first_id)) $first_id = $this->conn->insert_id;
-
-                $err = $insert_part($stmt, $payment_code, $parent_id, $bank_amount, 'Bank', $remarks, $user_id, $this);
-                if($err !== true) throw new Exception($err);
-                if(!isset($first_id)) $first_id = $this->conn->insert_id;
-                $stmt->close();
-            }
-
-            // Search Index Update
-            $search_data = implode(' ', [$payment_code, $remarks, $payment_method]);
-            $trans_date = date('Y-m-d'); // Payment date is typically current date in this logic
-            $this->update_search_index('transactions', $first_id, 'payment', $payment_code, $payment_method, $search_data, $total_payment, $trans_date, "transactions/payments/view_payment&id=$parent_id", "transactions/payments/manage_payment&id=$parent_id");
-
-            // Party Outstanding can be queried live easily now, so we just log success.
-
-            $this->conn->commit();
-            $resp['status'] = 'success';
-            $resp['msg'] = "Payment successfully recorded.";
-            $this->settings->set_flashdata('success', $resp['msg']);
-        } catch (Exception $e) {
-            $this->conn->rollback();
-            $resp['status'] = 'failed';
-            $resp['msg'] = $e->getMessage();
-        }
-        return json_encode($resp);
+            if (App\Accounting\Money::compare($total,'0')<=0) throw new InvalidArgumentException('Enter a positive payment amount.');
+            $_POST=['type'=>$invoice['type']==='purchase'?2:1,'party_id'=>$invoice['entity_id'],'date_created'=>$original['date_created']??date('Y-m-d'),
+                'invoices'=>[$parent],'allocation'=>[$total],'account_amounts'=>$funds,'remarks'=>$original['remarks']??''];
+            return $this->save_bulk_payment();
+        } catch (Throwable $error) {
+            if ($error instanceof mysqli_sql_exception) {error_log('Payment adapter: '.$error->getMessage());return json_encode(['status'=>'failed','msg'=>'Payment could not be recorded.']);}
+            return json_encode(['status'=>'failed','msg'=>$error->getMessage()]);
+        } finally { $_POST=$original; }
     }
-    
 
     function delete_payment(){
         extract($_POST);
@@ -2418,6 +2392,7 @@ Class Master extends DBConnection {
             
             if(!$stmt->execute()) throw new Exception($this->conn->error);
             $trans_id = empty($id) ? $this->conn->insert_id : $id;
+            $this->enterprise_context((int)$trans_id,$_POST['location_id']??null);
             $stmt->close();
 
             // Record/Update Adjustment Item
@@ -2517,6 +2492,7 @@ Class Master extends DBConnection {
         
         extract($_POST);
         try {
+            $this->prepare_enterprise_lines('return'); extract($_POST);
             $total = $this->line_totals($item_id ?? null, $qty ?? null, $price ?? null);
             $tax = App\Accounting\Money::decimal($_POST['tax'] ?? '0');
             if (App\Accounting\Money::compare($tax,'0') < 0) throw new InvalidArgumentException('Tax credit cannot be negative.');
@@ -2544,6 +2520,7 @@ Class Master extends DBConnection {
                 $return_code = $old_data['reference_code'];
                 $affected_items = $this->transaction_item_ids($id);
             }
+            $this->validate_linked_return($parent_id ?? null, $id ?? 0, $vendor_id ?? 0, $entity_type ?? '', $transaction_date, $item_id, $qty, $total, $tax);
             if(empty($id)){
                 $sql = "INSERT INTO `transactions` (`reference_code`, `type`, `entity_type`, `entity_id`, `total_amount`, `remarks`, `transaction_date`, `created_by`, `parent_id`, `tax`) VALUES (?, 'return', ?, ?, ?, ?, ?, ?, ?, ?)";
                 $stmt = $this->conn->prepare($sql);
@@ -2559,6 +2536,12 @@ Class Master extends DBConnection {
             if(!$stmt->execute()) throw new Exception($this->conn->error);
             $return_id = empty($id) ? $this->conn->insert_id : $id;
             $stmt->close();
+            $return_location=$_POST['location_id']??null;
+            if ($this->enterprise_enabled&&!empty($parent_id)) {
+                $source_context=$this->queryPrepared('SELECT location_id FROM erp_transaction_context WHERE transaction_id=?','i',[(int)$parent_id])->fetch_assoc();
+                $return_location=(int)($source_context['location_id']??1);
+            }
+            $this->enterprise_context((int)$return_id,$return_location);
             
             // Handle Items
             $del_items = $this->conn->prepare("DELETE FROM `transaction_items` WHERE transaction_id = ?");
@@ -2575,6 +2558,7 @@ Class Master extends DBConnection {
                     $ti_unit = isset($unit[$k]) ? $unit[$k] : '';
                     $ti_stmt->bind_param("iiddds", $return_id, $v, $ti_qty, $ti_price, $ti_tprice, $ti_unit);
                     if(!$ti_stmt->execute()) throw new Exception($this->conn->error);
+                    $this->enterprise_snapshot((int)$this->conn->insert_id,$k);
                 }
                 $ti_stmt->close();
                 
@@ -3143,9 +3127,10 @@ function get_balances_by_date(){
         $party_id = isset($party_id) ? intval($party_id) : 0;
         $payment_code = isset($payment_code) ? $payment_code : null;
         $bill_type = $type === 2 ? 'purchase' : 'sale';
+        $credit_adjustment=App\Enterprise\Settlement::sql($this->conn,'t');
         // Keep fully paid bills visible when editing the payment that settled them.
         $sql = "SELECT t.id, t.reference_code AS code, t.transaction_date AS date_created,
-                       (t.total_amount + t.tax) AS amount, (t.total_amount + t.tax) - COALESCE(SUM(p.total_amount + p.tax), 0) AS outstanding
+                       (t.total_amount + t.tax) AS amount, (t.total_amount + t.tax) - COALESCE(SUM(p.total_amount + p.tax), 0) + $credit_adjustment AS outstanding
                 FROM transactions t
                 LEFT JOIN transactions p ON p.parent_id = t.id AND p.type IN ('payment','return')
                 WHERE t.type = ? AND t.entity_id = ?
@@ -3276,7 +3261,8 @@ function get_balances_by_date(){
                 if (!$invoice || !is_finite($alloc_amount)) throw new Exception('Invalid invoice allocation.');
                 $paid = $this->queryPrepared("SELECT COALESCE(SUM(total_amount + tax), 0) AS paid FROM transactions WHERE parent_id=? AND type IN ('payment','return')",
                     'i', [$inv_id])->fetch_assoc()['paid'];
-                if ($alloc_amount > (float)$invoice['total_amount'] - (float)$paid + 0.001) {
+                $credit_adjustment=App\Enterprise\Settlement::adjustment($this->conn,(int)$inv_id);
+                if ($alloc_amount > (float)$invoice['total_amount'] - (float)$paid + (float)$credit_adjustment + 0.001) {
                     throw new Exception('Payment exceeds the outstanding invoice balance.');
                 }
                 
@@ -3405,12 +3391,17 @@ function get_balances_by_date(){
     function search_pos_items(){
         $q = '%' . (is_string($_GET['q'] ?? null) ? $_GET['q'] : '') . '%';
         $data = array();
-        $qry = $this->queryPrepared('SELECT i.*, c.name as category FROM item_list i LEFT JOIN category_list c ON i.category_id = c.id WHERE i.status = 1 AND (i.name LIKE ? OR i.description LIKE ? OR c.name LIKE ?) ORDER BY i.name ASC LIMIT 20', 'sss', [$q, $q, $q]);
+        if ($this->enterprise_enabled) {
+            $barcode=is_string($_GET['q']??null)?trim($_GET['q']):'';
+            $qry=$this->queryPrepared('SELECT i.*,c.name AS category,p.case_barcode,p.case_price,p.units_per_case FROM item_list i LEFT JOIN category_list c ON c.id=i.category_id LEFT JOIN erp_item_packaging p ON p.item_id=i.id WHERE i.status=1 AND (i.name LIKE ? OR i.description LIKE ? OR c.name LIKE ? OR p.barcode=? OR p.case_barcode=?) ORDER BY i.name LIMIT 20','sssss',[$q,$q,$q,$barcode,$barcode]);
+        } else $qry = $this->queryPrepared('SELECT i.*, c.name as category FROM item_list i LEFT JOIN category_list c ON i.category_id = c.id WHERE i.status = 1 AND (i.name LIKE ? OR i.description LIKE ? OR c.name LIKE ?) ORDER BY i.name ASC LIMIT 20', 'sss', [$q, $q, $q]);
         while($row = $qry->fetch_assoc()){
+            $case=$this->enterprise_enabled&&!empty($row['case_barcode'])&&$row['case_barcode']===($barcode??'');
             $data[] = array(
                 'id' => $row['id'],
                 'text' => $row['name'],
-                'price' => $row['selling_price'],
+                'price' => $case?($row['case_price']??bcmul($row['selling_price'],$row['units_per_case'],4)):$row['selling_price'],
+                'unit_code'=>$case?'case':'base',
                 'mrp' => $row['mrp'],
                 'available' => $row['quantity'],
                 'category' => $row['category']

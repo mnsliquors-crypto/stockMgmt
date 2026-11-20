@@ -293,6 +293,7 @@ final class JournalService {
             $this->date($start); $this->date($end);
             if (trim($name)==='' || mb_strlen($name)>100 || $start>$end) throw new \InvalidArgumentException('Enter a name and valid period dates.');
             if ($this->row('SELECT id FROM gl_periods WHERE start_date<=? AND end_date>=?',[$end,$start])) throw new \RuntimeException('Accounting periods cannot overlap.');
+            if ($this->db->query("SHOW TABLES LIKE 'erp_fiscal_years'")->num_rows && $this->row("SELECT id FROM erp_fiscal_years WHERE status='closed' AND start_date<=? AND end_date>=?",[$end,$start])) throw new \RuntimeException('The fiscal year is closed.');
             $this->query('INSERT INTO gl_periods (name,start_date,end_date) VALUES (?,?,?)',[$name,$start,$end]);
             $id=(int)$this->db->insert_id; $this->audit('create','period',$id,['start'=>$start,'end'=>$end]); return $id;
         });
@@ -302,6 +303,7 @@ final class JournalService {
             $this->query('SELECT id FROM erp_control WHERE id=1 FOR UPDATE');
             $period=$this->row('SELECT * FROM gl_periods WHERE id=? FOR UPDATE',[$id]);
             if (!$period || trim($reason)==='') throw new \InvalidArgumentException('Choose a period and enter a reason.');
+            if (!$close && $this->db->query("SHOW TABLES LIKE 'erp_fiscal_years'")->num_rows && $this->row("SELECT id FROM erp_fiscal_years WHERE status='closed' AND start_date<=? AND end_date>=?",[$period['end_date'],$period['start_date']])) throw new \RuntimeException('Reopen the fiscal year before reopening its periods.');
             if ($close) {
                 if ($this->row("SELECT id FROM gl_journals WHERE status='draft' AND entry_date BETWEEN ? AND ? LIMIT 1",[$period['start_date'],$period['end_date']])) throw new \RuntimeException('Post or move all draft journals before closing.');
                 if ($this->row("SELECT t.id FROM transactions t LEFT JOIN gl_journals j ON j.source_transaction_id=t.id AND j.status='posted' WHERE t.transaction_date BETWEEN ? AND ? AND j.id IS NULL LIMIT 1",[$period['start_date'],$period['end_date']])) throw new \RuntimeException('Unposted business documents remain in this period. Review and post them before closing.');

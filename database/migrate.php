@@ -28,4 +28,8 @@ foreach ($columns as $table => $definitions) {
 }
 require_once __DIR__ . '/migrations/001_accounting.php';
 migrate_accounting($db->conn);
+require_once __DIR__ . '/migrations/002_procurement.php';
+migrate_procurement($db->conn);
+require_once __DIR__ . '/migrations/003_friend_features.php';
+migrate_friend_features($db->conn);
 echo "Schema is up to date.\n";

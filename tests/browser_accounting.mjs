@@ -43,9 +43,14 @@ async function waitFor(expression, label) {
 }
 async function navigate(path) {
     await send('Page.navigate', {url: base + path});
-    await waitFor('document.readyState === "complete" && location.href.startsWith(' + JSON.stringify(base) + ')', path);
+    await waitFor('document.readyState === "complete" && location.href === ' + JSON.stringify(new URL(path, base).href), path);
+    await ready();
     const errors = await evaluate('/Fatal error|Uncaught |Warning:/.test(document.body.innerText)');
     if (errors) throw new Error('PHP error in ' + path);
+}
+async function ready() {
+    await waitFor('document.readyState === "complete" && typeof jQuery !== "undefined"', 'page ready');
+    await evaluate('new Promise(resolve => jQuery(() => resolve(true)))');
 }
 async function screenshot(name) {
     const result = await send('Page.captureScreenshot', {format: 'png', captureBeyondViewport: false});
@@ -53,6 +58,7 @@ async function screenshot(name) {
 }
 try {
     await send('Emulation.setDeviceMetricsOverride', {width: 1366, height: 900, deviceScaleFactor: 1, mobile: false});
+    await send('Network.clearBrowserCookies');
     await navigate('admin/login.php');
     const login = await evaluate(`(async function(){
         const token=document.querySelector('meta[name="csrf-token"]').content;
@@ -73,9 +79,11 @@ try {
         document.querySelector('#journal-form').requestSubmit();
     })()`);
     await waitFor('new URL(location.href).searchParams.has("id") && !!document.querySelector("[data-action=post_journal]")', 'save draft');
+    await ready();
     const journalId = await evaluate('new URL(location.href).searchParams.get("id")');
     await evaluate('document.querySelector("[data-action=post_journal]").click()');
     await waitFor('!!document.querySelector("[data-action=reverse_journal]")', 'post journal');
+    await ready();
     await screenshot('journal-desktop');
     await evaluate('document.querySelector("[data-action=reverse_journal]").click()');
     await waitFor('document.querySelector("#accounting-reason-modal").classList.contains("show")', 'reversal modal');

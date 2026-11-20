@@ -90,8 +90,6 @@
     <script src="<?php echo base_url ?>plugins/datatables-responsive/js/responsive.bootstrap4.min.js"></script>
     <!-- overlayScrollbars -->
     <!-- <script src="<?php echo base_url ?>plugins/overlayScrollbars/js/jquery.overlayScrollbars.min.js"></script> -->
-    <!-- AdminLTE App -->
-    <script src="<?php echo base_url ?>dist/js/adminlte.js"></script>
     <!-- Custom Components -->
     <script src="<?php echo base_url ?>dist/js/searchable-select.js?v=<?php echo time() ?>"></script>
 

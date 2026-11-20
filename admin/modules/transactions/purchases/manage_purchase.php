@@ -1,4 +1,9 @@
 <?php
+if ($conn->query("SHOW TABLES LIKE 'po_policy'")->num_rows
+    && (int)$conn->query('SELECT require_purchase_orders FROM po_policy WHERE id=1')->fetch_assoc()['require_purchase_orders'] === 1) {
+    echo '<div class="alert alert-info">Purchase orders are required.</div><a class="btn btn-primary btn-sm" href="'.base_url.'admin/?page=transactions/procurement"><i class="fas fa-shopping-cart mr-1"></i> Purchase Orders</a>';
+    return;
+}
 if(isset($_GET['id'])){
     // Fetch from unified transactions
     $qry = $conn->query("SELECT p.*, reference_code as po_code, entity_id as vendor_id, s.display_name as vendor FROM transactions p INNER JOIN entity_list s ON p.entity_id = s.id WHERE p.id = '{$_GET['id']}' AND p.type = 'purchase'");

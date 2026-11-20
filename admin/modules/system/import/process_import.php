@@ -443,6 +443,8 @@ try {
         }
     }
     else if($type === 'transactions') {
+        $require_purchase_orders = $db->conn->query("SHOW TABLES LIKE 'po_policy'")->num_rows
+            && (int)$db->conn->query('SELECT require_purchase_orders FROM po_policy WHERE id=1')->fetch_assoc()['require_purchase_orders'] === 1;
         $expected = ['type','reference_code','entity','account','total_amount','discount_perc','tax_perc','remarks','transaction_date'];
         if(array_values($headers) !== $expected) {
             throw new Exception('CSV headers do not match expected format: expected '.implode(',', $expected));
@@ -512,6 +514,10 @@ try {
             $tx_type = strtolower(trim($data['type']));
             if(!in_array($tx_type, ['sale', 'purchase'])) {
                 $errors[] = "Row {$current_row} skipped: Invalid type '{$data['type']}'. Must be 'sale' or 'purchase'";
+                continue;
+            }
+            if ($tx_type === 'purchase' && $require_purchase_orders) {
+                $errors[] = "Row {$current_row} skipped: Purchase orders are required. Receive an approved purchase order instead.";
                 continue;
             }
 

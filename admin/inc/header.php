@@ -32,6 +32,7 @@
     <link rel="stylesheet" href="<?php echo base_url ?>dist/css/modern_erp.css?v=<?php echo time() ?>">
     <link rel="stylesheet" href="<?php echo base_url ?>dist/css/custom.css?v=<?php echo time() ?>">
     <link rel="stylesheet" href="<?php echo base_url ?>dist/css/searchable-select.css?v=<?php echo time() ?>">
+    <?php if (!empty($enterprise_available)): ?><link rel="stylesheet" href="<?php echo base_url ?>dist/css/enterprise.css?v=1"><?php endif ?>
 
     <!-- overlayScrollbars -->
     <link rel="stylesheet" href="<?php echo base_url ?>plugins/overlayScrollbars/css/OverlayScrollbars.min.css">
@@ -55,8 +56,10 @@
     <script src="<?php echo base_url ?>plugins/toastr/toastr.min.js"></script>
     <script>
         var _base_url_ = '<?php echo base_url ?>';
+        var _enterprise_enabled_ = <?php echo !empty($enterprise_available)?'true':'false' ?>;
     </script>
     <script src="<?php echo base_url ?>dist/js/script.js"></script>
+    <?php if (!empty($enterprise_available)): ?><script src="<?php echo base_url ?>dist/js/enterprise-transactions.js?v=1" defer></script><?php endif ?>
 
 
   </head>

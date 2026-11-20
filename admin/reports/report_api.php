@@ -309,6 +309,7 @@ switch ($action) {
             }
 
         } elseif ($report === 'customer_outstanding') {
+            $credit_adjustment = class_exists('App\\Enterprise\\Settlement') ? \App\Enterprise\Settlement::sql($conn, 't') : '0';
             $customer_id = isset($_GET['customer_id']) ? intval($_GET['customer_id']) : 0;
             $status_f    = isset($_GET['status_f']) ? $_GET['status_f'] : 'outstanding';
             $and_cust   = $customer_id ? " AND t.entity_id={$customer_id}" : '';
@@ -317,12 +318,12 @@ switch ($action) {
             if ($status_f === 'outstanding') $and_status = " HAVING bal > 0";
             elseif ($status_f === 'paid')    $and_status = " HAVING bal <= 0";
 
-            fputcsv($out,['#','Date','Invoice No','Customer','Total Amount','Received','Balance Due','Status']);
+            fputcsv($out,['#','Date','Invoice No','Customer','Total Amount','Received / Credits','Balance Due','Status']);
             $i=1;
             $qry=$conn->query("
-                SELECT t.transaction_date, t.reference_code, COALESCE(c.display_name,'Walk-in') as cname, t.total_amount as ts, 
-                (SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id = t.id AND p.type='payment') as tr, 
-                (t.total_amount - (SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id = t.id AND p.type='payment')) as bal 
+                SELECT t.transaction_date, t.reference_code, COALESCE(c.display_name,'Walk-in') as cname, (t.total_amount + t.tax) as ts,
+                ((SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id=t.id AND p.type='payment') + (SELECT COALESCE(SUM(r.total_amount+r.tax),0) FROM transactions r WHERE r.parent_id=t.id AND r.type='return') - {$credit_adjustment}) as tr,
+                (t.total_amount + t.tax - (SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id=t.id AND p.type='payment') - (SELECT COALESCE(SUM(r.total_amount+r.tax),0) FROM transactions r WHERE r.parent_id=t.id AND r.type='return') + {$credit_adjustment}) as bal
                 FROM transactions t LEFT JOIN entity_list c ON t.entity_id=c.id AND c.entity_type = 'Customer'
                 WHERE t.type='sale' {$and_cust} {$and_date} 
                 {$and_status} 
@@ -334,6 +335,7 @@ switch ($action) {
             }
 
         } elseif ($report === 'vendor_outstanding') {
+            $credit_adjustment = class_exists('App\\Enterprise\\Settlement') ? \App\Enterprise\Settlement::sql($conn, 't') : '0';
             $vendor_id = isset($_GET['vendor_id']) ? intval($_GET['vendor_id']) : 0;
             $status_f    = isset($_GET['status_f']) ? $_GET['status_f'] : 'outstanding';
             $and_vendor = $vendor_id ? " AND t.entity_id={$vendor_id}" : '';
@@ -342,12 +344,12 @@ switch ($action) {
             if ($status_f === 'outstanding') $and_status = " HAVING bal > 0";
             elseif ($status_f === 'paid')    $and_status = " HAVING bal <= 0";
 
-            fputcsv($out,['#','Date','Bill No.','Vendor','Total Amount','Paid','Pending Amount','Status']);
+            fputcsv($out,['#','Date','Bill No.','Vendor','Total Amount','Paid / Credits','Pending Amount','Status']);
             $i=1;
             $qry=$conn->query("
-                SELECT t.transaction_date, t.reference_code, COALESCE(v.display_name,'Unknown') as vname, t.total_amount as tp, 
-                (SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id = t.id AND p.type='payment') as tpd, 
-                (t.total_amount - (SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id = t.id AND p.type='payment')) as bal 
+                SELECT t.transaction_date, t.reference_code, COALESCE(v.display_name,'Unknown') as vname, (t.total_amount + t.tax) as tp,
+                ((SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id=t.id AND p.type='payment') + (SELECT COALESCE(SUM(r.total_amount+r.tax),0) FROM transactions r WHERE r.parent_id=t.id AND r.type='return') - {$credit_adjustment}) as tpd,
+                (t.total_amount + t.tax - (SELECT COALESCE(SUM(p.total_amount),0) FROM transactions p WHERE p.parent_id=t.id AND p.type='payment') - (SELECT COALESCE(SUM(r.total_amount+r.tax),0) FROM transactions r WHERE r.parent_id=t.id AND r.type='return') + {$credit_adjustment}) as bal
                 FROM transactions t LEFT JOIN entity_list v ON t.entity_id=v.id AND v.entity_type = 'Supplier'
                 WHERE t.type='purchase' {$and_vendor} {$and_date} 
                 {$and_status} 

@@ -7,6 +7,7 @@ $to          = isset($_GET['to'])   ? $_GET['to']   : date("Y-m-d");
 $and_vendor = $vendor_id ? " AND t.entity_id={$vendor_id}" : '';
 $and_date   = " AND DATE(t.transaction_date) BETWEEN '{$from}' AND '{$to}'";
 $and_status = '';
+$credit_adjustment=App\Enterprise\Settlement::sql($conn,'t');
 if ($status_f === 'outstanding') $and_status = " HAVING pending_amount > 0";
 elseif ($status_f === 'paid')    $and_status = " HAVING pending_amount <= 0";
 
@@ -19,8 +20,8 @@ $qry = $conn->query("
         COALESCE(v.display_name,'Unknown') as vendor_name,
         COALESCE(v.contact,'') as contact,
         (t.total_amount + t.tax) as total_purchase,
-        (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return')) as total_paid_returned,
-        ((t.total_amount + t.tax) - (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return'))) as pending_amount
+        (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return')) - $credit_adjustment as total_paid_returned,
+        ((t.total_amount + t.tax) - (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return')) + $credit_adjustment) as pending_amount
     FROM transactions t
     LEFT JOIN entity_list v ON t.entity_id = v.id AND v.entity_type = 'Supplier'
     WHERE t.type = 'purchase' {$and_vendor} {$and_date}

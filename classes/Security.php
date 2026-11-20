@@ -33,12 +33,12 @@ function enforce_request_security() {
         deny_request(401, 'Please sign in.');
     }
 
-    foreach ([$_GET, $_POST] as $input) {
+    foreach (['get'=>$_GET, 'post'=>$_POST] as $source=>$input) {
         foreach (['id', 'item_id', 'vendor_id', 'customer_id', 'entity_id', 'account_id', 'parent_id',
-            'from_sale_id','from_purchase_id','party_id','transaction_id','from_account_id','to_account_id'] as $key) {
+            'from_sale_id','from_purchase_id','party_id','transaction_id','from_account_id','to_account_id','order_id','receipt_id','approver_id','location_id','from_location_id','to_location_id','assigned_to','user_id','role_id','gl_account_id'] as $key) {
             if ($key === 'id' && $relative === 'admin/modules/system/import/get_progress.php') continue;
             if (!isset($input[$key]) || $input[$key] === '') continue;
-            $values = is_array($input[$key]) && $key === 'item_id' ? $input[$key] : [$input[$key]];
+            $values = is_array($input[$key]) && $key === 'item_id' && $source==='post' ? $input[$key] : [$input[$key]];
             foreach ($values as $value) {
                 if (!is_scalar($value) || !ctype_digit((string)$value)) deny_request(400, 'Invalid record ID.');
             }
@@ -53,6 +53,7 @@ function enforce_request_security() {
     }
 
     $page = is_string($_GET['page'] ?? null) ? $_GET['page'] : '';
+    if (isset($_GET['page'])&&!is_string($_GET['page'])) deny_request(404,'Invalid page.');
     $admin_only = in_array($relative, ['classes/GitSync.php', 'classes/SystemSettings.php'], true)
         || ($relative === 'classes/Master.php' && in_array($_GET['f'] ?? '', ['save_ref_code_setting', 'save_bulk_ref_codes'], true))
         || strpos($relative, 'admin/modules/system/') === 0

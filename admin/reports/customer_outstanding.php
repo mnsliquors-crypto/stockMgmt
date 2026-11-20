@@ -7,6 +7,7 @@ $to          = isset($_GET['to'])   ? $_GET['to']   : date("Y-m-d");
 $and_cust   = $customer_id ? " AND t.entity_id={$customer_id}" : '';
 $and_date   = " AND DATE(t.transaction_date) BETWEEN '{$from}' AND '{$to}'";
 $and_status = '';
+$credit_adjustment=App\Enterprise\Settlement::sql($conn,'t');
 if ($status_f === 'outstanding') $and_status = " HAVING balance_due > 0";
 elseif ($status_f === 'paid')    $and_status = " HAVING balance_due <= 0";
 
@@ -19,8 +20,8 @@ $qry = $conn->query("
         COALESCE(c.display_name, 'Walk-in') as customer_name,
         COALESCE(c.contact, '') as contact,
         (t.total_amount + t.tax) as total_sales,
-        (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return')) as total_received_returned,
-        ((t.total_amount + t.tax) - (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return'))) as balance_due
+        (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return')) - $credit_adjustment as total_received_returned,
+        ((t.total_amount + t.tax) - (SELECT COALESCE(SUM(p.total_amount + p.tax),0) FROM transactions p WHERE p.parent_id = t.id AND p.type IN ('payment', 'return')) + $credit_adjustment) as balance_due
     FROM transactions t
     LEFT JOIN entity_list c ON t.entity_id = c.id AND c.entity_type = 'Customer'
     WHERE t.type = 'sale' {$and_cust} {$and_date}

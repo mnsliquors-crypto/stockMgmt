@@ -2,13 +2,12 @@
 require_once('../../../../config.php');
 
 // DataTables server-side processing for Sales
-$draw = $_POST['draw'];
-$row = $_POST['start'];
-$rowperpage = $_POST['length'];
-$columnIndex = $_POST['order'][0]['column'];
-$columnName = $_POST['columns'][$columnIndex]['data'];
-$columnSortOrder = $_POST['order'][0]['dir'];
-$searchValue = $_POST['search']['value'];
+$draw = (int)($_POST['draw']??0);
+$row = max(0,(int)($_POST['start']??0));
+$rowperpage = min(250,max(1,(int)($_POST['length']??25)));
+$columnIndex = (int)($_POST['order'][0]['column']??0);
+$columnSortOrder = strtolower((string)($_POST['order'][0]['dir']??'desc'))==='asc'?'ASC':'DESC';
+$searchValue = is_string($_POST['search']['value']??null)?mb_substr($_POST['search']['value'],0,120):'';
 
 // Column mapping for sorting
 $columns = array(
@@ -44,20 +43,21 @@ $stmt->execute();
 $totalRecordwithFilter = $stmt->get_result()->fetch_array()[0];
 
 // Order by
+$credit_adjustment=App\Enterprise\Settlement::sql($conn,'t');
 $orderBy = "t.transaction_date $columnSortOrder, t.id $columnSortOrder";
 if(isset($columns[$columnIndex])) {
     $col = $columns[$columnIndex];
     if($col == 'total_paid') $orderBy = "COALESCE(pay.total_paid, 0) + COALESCE(ret.total_returned, 0) $columnSortOrder";
-    else if($col == 'outstanding') $orderBy = "t.total_amount - (COALESCE(pay.total_paid, 0) + COALESCE(ret.total_returned, 0)) $columnSortOrder";
+    else if($col == 'outstanding') $orderBy = "t.total_amount + t.tax - (COALESCE(pay.total_paid, 0) + COALESCE(ret.total_returned, 0)) + $credit_adjustment $columnSortOrder";
     else $orderBy = "$col $columnSortOrder";
 }
 
 // Fetch records
-$sql = "SELECT t.id, t.transaction_date, t.reference_code, t.total_amount, t.discount, t.entity_id, t.remarks, c.display_name as customer_name, COALESCE(pay.total_paid, 0) as total_paid, COALESCE(ret.total_returned, 0) as total_returned
+$sql = "SELECT t.id, t.transaction_date, t.reference_code, t.total_amount, t.tax, t.discount, t.entity_id, t.remarks, c.display_name as customer_name, COALESCE(pay.total_paid, 0) as total_paid, COALESCE(ret.total_returned, 0) - $credit_adjustment as total_returned
         FROM transactions t 
         LEFT JOIN entity_list c ON t.entity_id = c.id AND c.entity_type = 'Customer'
         LEFT JOIN (SELECT parent_id, SUM(total_amount) as total_paid FROM transactions WHERE type = 'payment' GROUP BY parent_id) pay ON t.id = pay.parent_id 
-        LEFT JOIN (SELECT parent_id, SUM(total_amount) as total_returned FROM transactions WHERE type = 'return' GROUP BY parent_id) ret ON t.id = ret.parent_id 
+        LEFT JOIN (SELECT parent_id, SUM(total_amount+tax) as total_returned FROM transactions WHERE type = 'return' GROUP BY parent_id) ret ON t.id = ret.parent_id
         WHERE t.type = 'sale' $searchQuery 
         ORDER BY $orderBy 
         LIMIT ?, ?";
@@ -78,9 +78,9 @@ $i = $row + 1;
 while ($row_data = $records->fetch_assoc()) {
     $total_paid = floatval($row_data['total_paid']);
     $total_returned = floatval($row_data['total_returned']);
-    $grand_total = floatval($row_data['total_amount']);
+    $grand_total = floatval($row_data['total_amount']) + floatval($row_data['tax']);
     $discount = floatval($row_data['discount']);
-    $sub_total = $grand_total + $discount;
+    $sub_total = floatval($row_data['total_amount']) + $discount;
     $outstanding = $grand_total - $total_paid - $total_returned;
     
     if($outstanding <= 0.01):
@@ -117,8 +117,8 @@ while ($row_data = $records->fetch_assoc()) {
     $data[] = array(
         "index" => $i++,
         "date" => date("d-m-Y", strtotime($row_data['transaction_date'])),
-        "code" => $row_data['reference_code'] . (strpos($row_data['remarks'] ?? '', '[POS]') !== false ? ' <span class="badge badge-info shadow-sm" title="POS Entry">POS</span>' : ''),
-        "customer" => $row_data['customer_name'] ?? 'Walk-in',
+        "code" => htmlspecialchars($row_data['reference_code']??'',ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8') . (strpos($row_data['remarks'] ?? '', '[POS]') !== false ? ' <span class="badge badge-info shadow-sm" title="POS Entry">POS</span>' : ''),
+        "customer" => htmlspecialchars($row_data['customer_name'] ?? 'Walk-in',ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8'),
 
         "sub_total" => '<span class="badge badge-light border">'.number_format($sub_total, 2).'</span>',
         "discount" => '<span class="badge badge-warning">'.number_format($discount, 2).'</span>',

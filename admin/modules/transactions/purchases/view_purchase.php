@@ -24,7 +24,9 @@ if($calc_total > $total_amount){
 
 // Calculate payment and return details
 $total_paid = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as paid FROM `transactions` WHERE parent_id = '{$id}' AND type = 'payment'")->fetch_assoc()['paid'] ?? 0;
-$total_returned = $conn->query("SELECT COALESCE(SUM(total_amount), 0) as returned FROM `transactions` WHERE parent_id = '{$id}' AND type = 'return'")->fetch_assoc()['returned'] ?? 0;
+$total_returned = $conn->query("SELECT COALESCE(SUM(total_amount + tax), 0) as returned FROM `transactions` WHERE parent_id = '{$id}' AND type = 'return'")->fetch_assoc()['returned'] ?? 0;
+$total_returned=bcsub((string)$total_returned,App\Enterprise\Settlement::adjustment($conn,(int)$id),2);
+$purchase_locked = !empty($posting) || !empty($goods_receipt);
 // Balance = (Amount + Tax) - Paid - Returned
 $balance = floatval($amount) + floatval($tax ?? 0) - floatval($total_paid) - floatval($total_returned);
 // Determine status
@@ -74,12 +76,12 @@ endif;
                 <a class="btn btn-flat btn-sm btn-return" href="<?php echo base_url ?>admin/?page=transactions/returns/manage_return&from_purchase_id=<?php echo $id ?>" title="Create Return">
                     <i class="fa fa-arrow-left"></i> Return
                 </a>
-                <a href="./?page=transactions/purchases/manage_purchase&id=<?php echo $id ?>" class="btn btn-flat btn-sm btn-primary" title="Edit">
+                <?php if (!$purchase_locked): ?><a href="./?page=transactions/purchases/manage_purchase&id=<?php echo $id ?>" class="btn btn-flat btn-sm btn-primary" title="Edit">
                     <i class="fa fa-edit"></i>
                 </a>
                 <button class="btn btn-flat btn-sm btn-danger" id="delete_purchase" type="button" title="Delete">
                     <i class="fa fa-trash"></i>
-                </button>
+                </button><?php endif ?>
                 <a class="btn btn-flat btn-sm btn-dark" href="./?page=transactions/purchases" title="Back to List"><i class="fa fa-list"></i></a>
                 <button class="btn btn-flat btn-sm btn-success" id="print_btn" type="button" title="Print"><i class="fa fa-print"></i></button>
             </div>

@@ -101,6 +101,7 @@ while($row = $accounts->fetch_assoc()){
 
 <div class="container-fluid py-2">
     <form action="" id="pos-form">
+        <?php if (!empty($enterprise_available)): ?><input type="hidden" name="checkout_request_key" value="<?php echo bin2hex(random_bytes(20)) ?>"><?php endif ?>
         <div class="row">
             <!-- Left Panel: Cart & Items (8 cols) -->
             <div class="col-md-8">
@@ -300,6 +301,7 @@ while($row = $accounts->fetch_assoc()){
                     selling_price: item.price,
                     mrp: item.mrp,
                     available: item.available
+                    ,unit_code:item.unit_code||'base'
                 };
             }
         });
@@ -353,6 +355,7 @@ while($row = $accounts->fetch_assoc()){
                 var tr = $('#clone_list tr').clone();
                 
                 tr.attr('data-id', item);
+                tr.attr('data-unit-code',items[item].unit_code||'base');
                 tr.find('[name="item_id[]"]').val(item);
                 tr.find('.item-name').text(items[item].name);
                 tr.find('.price-input').val(rate);
@@ -506,27 +509,30 @@ while($row = $accounts->fetch_assoc()){
                         // alert_toast(resp.msg, 'success');
                         
                         // Show return amount overlay instead of reloading
-                        var return_amt = $('#return_amount_display').text();
+                        var return_amt = resp.change_due!==undefined?Number(resp.change_due).toFixed(2):$('#return_amount_display').text();
                         var return_html = '<div id="return-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;">';
                         return_html += '<h1 style="font-size:4rem;color:#00ff00;">CHANGE DUE</h1>';
                         return_html += '<h1 style="font-size:8rem;font-weight:bold;">Rs. '+return_amt+'</h1>';
-                        return_html += '<button class="btn btn-lg btn-light mt-5" id="close-overlay-btn" onclick="$(\'#return-overlay\').remove(); $(\'#item_id\').select2(\'open\');">NEXT CUSTOMER (Press Enter / ESC)</button>';
+                        if(resp.receipt_key) return_html+='<a class="btn btn-outline-light mt-3" target="_blank" rel="noopener" href="'+_base_url_+'admin/?page=enterprise/receipts&key='+encodeURIComponent(resp.receipt_key)+'"><i class="fas fa-print mr-2"></i> Receipt</a>';
+                        return_html += '<button class="btn btn-lg btn-light mt-5" id="close-overlay-btn">NEXT CUSTOMER</button>';
                         return_html += '</div>';
                         $('body').append(return_html);
                         
                         $('#close-overlay-btn').focus();
+                        $('#close-overlay-btn').on('click',function(){$('#return-overlay').remove();itemSS.input.focus();});
                         
                         // Close overlay with enter/esc
                         $(document).on('keyup.overlay', function(e){
                             if(e.which == 13 || e.which == 27){
                                 $('#return-overlay').remove();
                                 $(document).off('keyup.overlay');
-                                $('#item_id').select2('open');
+                                itemSS.input.focus();
                             }
                         });
                         
                         // Reset Form Correctly
                         $('#pos-cart-table tbody').empty();
+                        if(resp.receipt_key){const bytes=new Uint8Array(20);crypto.getRandomValues(bytes);$('#pos-form [name=checkout_request_key]').val(Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join(''));}
                         $('.paid-amount-input').val('');
                         $('#paid_amount').val('');
                         
