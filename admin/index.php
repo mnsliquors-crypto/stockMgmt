@@ -85,8 +85,12 @@
                       deny_request(403, 'Administrator access required.');
                   }
                   include __DIR__ . '/inc/posting_status.php';
+                  $setupPages = ['system/users','system/settings','system/git_sync','enterprise/roles','enterprise/fiscal_years','enterprise/health','enterprise/feature_controls','transactions/opening_balances'];
+                  $inSetup = (int)$_settings->userdata('type') === 1 && $page !== 'system/users/profile' && array_reduce($setupPages, static fn($match, $prefix) => $match || $page === $prefix || str_starts_with($page, $prefix.'/'), false);
+                  if ($inSetup) { echo '<div class="setup-layout">'; include __DIR__.'/inc/setup_sidebar.php'; echo '<div class="setup-content">'; }
                   include $include_file;
                   include __DIR__.'/inc/master_usage.php';
+                  if ($inSetup) echo '</div></div>';
               }else{
                   http_response_code(404);
                   echo '<div class="text-center py-5">

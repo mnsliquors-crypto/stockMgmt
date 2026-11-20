@@ -30,7 +30,7 @@
 .suite-report-group { padding-bottom:18px; }
 .suite-report-group h6 { color:var(--suite-muted); padding:4px 8px; margin-bottom:4px; }
 .suite-report-link { display:block; padding:5px 8px; font-size:13px; color:var(--suite-text); border-left:2px solid transparent; }
-.suite-report-link.active { background:var(--suite-soft); border-left-color:#13859c; font-weight:600; }
+.suite-report-link.active { background:var(--suite-soft); border-left-color:var(--erp-accent,#003366); font-weight:600; }
 .suite-report-output { min-width:0; }
 .suite-report-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; border-bottom:1px solid var(--suite-line); padding-bottom:18px; margin-bottom:18px; }
 .suite-report-basis { color:var(--suite-muted); font-size:12px; line-height:1.6; max-width:100%; }
@@ -46,9 +46,9 @@
 .suite-receipt dd { text-align:right; }
 .suite-shortcuts { display:flex; gap:6px; flex-wrap:wrap; padding:12px 0; border-top:1px solid var(--suite-line); border-bottom:1px solid var(--suite-line); }
 .suite-shortcuts a { display:flex; align-items:center; gap:8px; padding:6px 10px; font-size:12px; color:var(--suite-text); }
-.suite-shortcuts i { color:#128195; width:16px; text-align:center; }
+.suite-shortcuts i { color:var(--erp-accent,#003366); width:16px; text-align:center; }
 .suite-kpis { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; margin-bottom:24px; }
-.suite-kpi { display:flex; flex-direction:column; gap:8px; padding:14px 12px; min-width:0; border:1px solid var(--suite-line); border-top:3px solid #158e80; border-radius:4px; background:var(--suite-bg); color:var(--suite-text)!important; text-decoration:none!important; }
+.suite-kpi { display:flex; flex-direction:column; gap:8px; padding:14px 12px; min-width:0; border:1px solid var(--suite-line); border-top:3px solid #003366; border-radius:4px; background:var(--suite-bg); color:var(--suite-text)!important; text-decoration:none!important; }
 .suite-kpi:nth-child(3n+2) { border-top-color:#bd7c1d; }
 .suite-kpi:nth-child(3n) { border-top-color:#b84463; }
 .suite-kpi-label { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--suite-muted); min-height:32px; }

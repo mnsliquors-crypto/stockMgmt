@@ -49,9 +49,9 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
                 <a class="dropdown-item px-4 py-2" href="<?php echo base_url ?>admin/?page=system/users/profile">
                     <i class="far fa-user-circle mr-3"></i> My Profile
                 </a>
-                <a class="dropdown-item px-4 py-2" href="<?php echo base_url ?>admin/?page=system/settings">
-                    <i class="fas fa-cog mr-3"></i> Preferences
-                </a>
+                <?php if ((int)$_settings->userdata('type') === 1): ?>
+                <a class="dropdown-item px-4 py-2 profile-setup-link" href="<?php echo base_url ?>admin/?page=system/users"><i class="fas fa-cog mr-3" aria-hidden="true"></i> Setup</a>
+                <?php endif ?>
                 <div class="dropdown-divider mx-3"></div>
                 <a class="dropdown-item px-4 py-2 text-danger" href="<?php echo base_url.'/classes/Login.php?f=logout' ?>">
                     <i class="fas fa-power-off mr-3"></i> Log Out
@@ -180,20 +180,6 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
             </div>
         </li>
 
-        <!-- Customizations & Setup -->
-        <?php if($_settings->userdata('type') == 1): ?>
-        <li class="ns-menu-item <?php echo strpos($page, 'system/') !== false ? 'active' : '' ?>">
-            <a href="#" class="ns-menu-link">Setup <i class="fas fa-chevron-down ml-2" style="font-size: 0.6rem;"></i></a>
-            <div class="ns-dropdown">
-                <a href="<?php echo base_url ?>admin/?page=system/users" class="ns-dropdown-link">User Management</a>
-                <?php if(!empty($enterprise_available)): ?><a href="<?php echo base_url ?>admin/?page=enterprise/roles" class="ns-dropdown-link">Access Roles</a><a href="<?php echo base_url ?>admin/?page=enterprise/fiscal_years" class="ns-dropdown-link">Fiscal Years</a><a href="<?php echo base_url ?>admin/?page=enterprise/health" class="ns-dropdown-link">System Integrity</a><?php endif ?>
-                <a href="<?php echo base_url ?>admin/?page=system/settings" class="ns-dropdown-link">Company Information</a>
-                <a href="<?php echo base_url ?>admin/?page=transactions/opening_balances" class="ns-dropdown-link">Opening Balances</a>
-                <a href="<?php echo base_url ?>admin/?page=system/settings/ref_codes" class="ns-dropdown-link">Reference Codes</a>
-                <a href="<?php echo base_url ?>admin/?page=system/git_sync" class="ns-dropdown-link">Git Sync (Backup)</a>
-            </div>
-        </li>
-        <?php endif; ?>
     </ul>
 </nav>
 

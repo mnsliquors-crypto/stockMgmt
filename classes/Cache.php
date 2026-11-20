@@ -6,11 +6,17 @@ class Cache {
     private $cache_dir;
     private $expiry;
 
-    public function __construct($expiry = 3600) {
+    public function __construct($expiry = 3600, ?string $namespace = null) {
         $this->cache_dir = rtrim(getenv('APP_CACHE_DIR') ?: __DIR__ . '/../temp/cache/', '/\\') . DIRECTORY_SEPARATOR;
+        if ($namespace !== null) {
+            if ($namespace === '' || strlen($namespace) > 128 || !preg_match('/^[A-Za-z0-9_-]+$/D', $namespace)) {
+                throw new InvalidArgumentException('Invalid cache namespace.');
+            }
+            $this->cache_dir .= 'tenant-' . hash('sha256', $namespace) . DIRECTORY_SEPARATOR;
+        }
         $this->expiry = $expiry;
-        if (!is_dir($this->cache_dir)) {
-            mkdir($this->cache_dir, 0777, true);
+        if (!is_dir($this->cache_dir) && !@mkdir($this->cache_dir, $namespace === null ? 0777 : 0700, true) && !is_dir($this->cache_dir)) {
+            throw new RuntimeException('Unable to create cache directory.');
         }
     }
 

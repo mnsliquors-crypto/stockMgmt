@@ -31,7 +31,7 @@ $suiteTable=static function (array $rows) use ($suiteEscape) {
 };
 $suitePreferences=$suiteWorkspace->preferences();
 ?>
-<link rel="stylesheet" href="<?php echo base_url ?>dist/css/enterprise.css?v=1">
+<link rel="stylesheet" href="<?php echo base_url ?>dist/css/enterprise.css?v=<?php echo filemtime(base_app.'dist/css/enterprise.css') ?>">
 <script src="<?php echo base_url ?>dist/js/enterprise.js?v=1" defer></script>
 <div class="suite-workspace py-3" data-module="<?php echo $suiteEscape($suiteModule) ?>" data-url="<?php echo $suiteEscape($suiteUrl) ?>" data-can-write="<?php echo $suiteCanWrite?'1':'0' ?>" data-theme="<?php echo $suiteEscape($suitePreferences['settings']['theme']??'light') ?>">
 <div id="suite-message" role="alert" aria-live="polite"></div>
