@@ -16,7 +16,7 @@ require_once('classes/SystemSettings.php');
 $db = new DBConnection;
 $conn = $db->conn;
 $enterprise_available=$conn->query("SHOW TABLES LIKE 'erp_schema_versions'")->num_rows
-    && $conn->query("SELECT version FROM erp_schema_versions WHERE version='003_friend_features'")->num_rows>0;
+    && $conn->query("SELECT version FROM erp_schema_versions WHERE version='".ERP_V3_SCHEMA_VERSION."'")->num_rows>0;
 require_once __DIR__ . '/classes/Enterprise/Access.php';
 require_once __DIR__ . '/classes/Enterprise/Settlement.php';
 App\Enterprise\Access::enforce($conn);

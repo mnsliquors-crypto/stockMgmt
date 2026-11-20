@@ -60,7 +60,7 @@
                 events:function (range,success,failure) {
                     $.getJSON(endpoint+'activities',{from:range.startStr.slice(0,10),to:range.endStr.slice(0,10)}).done(response=>success(response.data.map(row=>({
                         id:row.id,title:row.title,start:row.starts_at.replace(' ','T'),end:row.ends_at?row.ends_at.replace(' ','T'):null,
-                        url:root.data('url')+'&id='+row.id,color:row.status==='completed'?'#76838b':(row.kind==='event'?'#b76a1b':(row.kind==='call'?'#b54869':'#138495'))
+                        url:root.data('url')+'&id='+row.id,color:row.status==='completed'?'#78878a':(row.kind==='event'?'#567f9a':(row.kind==='call'?'#926f8b':'#087f75'))
                     })))).fail(failure);
                 }
             });calendar.render();
@@ -89,7 +89,7 @@
             const empty={afterDraw(instance){if(type!=='doughnut'||datasets.some(set=>set.data.some(value=>Number(value)!==0)))return;const context=instance.chart.ctx;context.save();context.fillStyle='#76838b';context.font='13px Arial';context.textAlign='center';context.fillText('No payments in this period',instance.chart.width/2,instance.chart.height/2);context.restore();}};
             charts.push(new Chart(document.getElementById(id),{type,data:{labels,datasets},plugins:[empty],options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},legend:{display:true,position:'bottom',labels:{boxWidth:10,fontSize:11}},scales:type==='doughnut'?{}:{yAxes:[{ticks:{beginAtZero:true}}],xAxes:[{gridLines:{display:false},ticks:{maxTicksLimit:8}}]}}}));
         }
-        const colors=['#168c81','#be7f25','#b34b69','#2384b4','#6f7a43','#916ca4'];
+        const colors=['#087f75','#7a8f93','#ab6170','#567f9a','#89966b','#9a86a2'];
         chart('suite-trend-chart','line',dashboard.trend.map(row=>row.day),['sales','purchases'].map((key,index)=>({label:key==='sales'?'Sales':'Purchases',data:dashboard.trend.map(row=>row[key]),borderColor:colors[index],backgroundColor:'transparent',fill:false,lineTension:0.2,pointRadius:2})));
         chart('suite-monthly-chart','bar',dashboard.monthly.map(row=>row.month),['sales','purchases','expenses'].map((key,index)=>({label:key.charAt(0).toUpperCase()+key.slice(1),data:dashboard.monthly.map(row=>row[key]),backgroundColor:colors[index]})));
         chart('suite-payment-chart','doughnut',dashboard.payments.map(row=>row.name),[{label:'Customer Payments',data:dashboard.payments.map(row=>row.amount),backgroundColor:colors}]);
@@ -97,6 +97,11 @@
         chart('suite-hourly-chart','bar',dashboard.hourly.map(row=>String(row.hour).padStart(2,'0')+':00'),[{label:'POS Sales',data:dashboard.hourly.map(row=>row.amount),backgroundColor:colors[3]}]);
         chart('suite-profit-chart','line',dashboard.profit_trend?dashboard.profit_trend.map(row=>row.Date):[],[{label:'Gross Profit',data:(dashboard.profit_trend||[]).map(row=>Number(row.Revenue)-Number(row.COGS)),borderColor:colors[0],backgroundColor:'transparent',fill:false}]);
         chart('suite-expense-chart','bar',dashboard.trend.map(row=>row.day),[{label:'Expenses',data:dashboard.trend.map(row=>row.expenses),backgroundColor:colors[2]}]);
+        function themeCharts() {
+            const style=getComputedStyle(root[0]),ink=style.getPropertyValue('--suite-muted').trim(),line=style.getPropertyValue('--suite-line').trim();
+            charts.forEach(item=>{item.options.legend.labels.fontColor=ink;['xAxes','yAxes'].forEach(axis=>(item.options.scales[axis]||[]).forEach(scale=>{scale.ticks.fontColor=ink;scale.gridLines.color=line;}));item.update(0);});
+        }
+        themeCharts();new MutationObserver(themeCharts).observe(root[0],{attributes:true,attributeFilter:['data-theme']});
         $('#suite-dashboard-refresh').on('click',()=>location.reload());
         let timer=null;$('#suite-auto-refresh').on('change',function () {if (timer)clearInterval(timer);if(this.checked)timer=setInterval(()=>{if(!document.hidden&&!$('.modal.show').length)location.reload();},30000);});
         function preferencesData() {const form=document.querySelector('#suite-preferences-form');return {version:form.elements.version.value,theme:form.elements.theme.value,widgets:$(form).find('[name="widgets[]"]:checked').map(function(){return this.value;}).get()};}

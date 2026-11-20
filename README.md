@@ -1,9 +1,16 @@
-# Stock Management
+# Karyasetu Enterprise Platform
 
-A PHP/MySQL inventory and bookkeeping application for a retail store. It tracks
+A PHP/MySQL enterprise application for inventory and bookkeeping, by Karyasetu
+Tech. Nepal. It tracks
 items, suppliers, customers, purchases, sales, POS receipts, returns, stock
 adjustments, payments, expenses, account transfers, opening balances, and daily
 cash reconciliation. Reports cover stock, profit, receivables, payables, and VAT.
+
+Application branding is defined by the `APP_*` constants in `initialize.php`.
+The supplied Karyasetu logo is used for sign-in, navigation, and the browser icon;
+the shared footer credits Karyasetu Tech. Nepal. Company Information remains
+separate: the store's name, logo, address, and tax details still identify its
+invoices, receipts, purchase orders, and statements.
 
 The UI uses AdminLTE, Bootstrap, jQuery, DataTables, and Select2. `classes/Master.php`
 handles business transactions, `classes/Users.php` manages accounts, and
@@ -16,6 +23,8 @@ they are not automatically merged into login accounts.
 Requires PHP 8.1+ with mysqli, mysqlnd, BCMath, GD, fileinfo, and cURL, plus MySQL 8 or
 MariaDB. XAMPP is supported. The bundled database is a store snapshot, so import
 it into a disposable development database first.
+
+### macOS / Linux
 
 ```sh
 mysql -u root -e 'CREATE DATABASE stockmgmt_dev CHARACTER SET utf8mb4'
@@ -31,6 +40,79 @@ password. `APP_TIMEZONE` defaults to `Asia/Kathmandu`. With XAMPP's `/sms/` path
 the default URL is `http://localhost/sms/`. Environment variables are read by
 `initialize.php`; `.env` files are not loaded automatically.
 On this Mac, the installed PHP executable is `/opt/homebrew/opt/php@8.3/bin/php`.
+
+### Windows (PowerShell)
+
+Copy the complete updated project folder to `C:\Projects\stockMgmt`, or clone
+the repository after all V3 Update changes have been committed and pushed.
+Include the new files, logo, and migrations. No npm or Composer install is needed
+for the current application.
+
+Use the PHP extensions and database requirements listed above. Start the database
+through its Windows service or, when using XAMPP, its Control Panel. Apache is
+not needed for the PHP development-server method below.
+
+1. Open PowerShell and check the installed tools:
+
+   ```powershell
+   cd C:\Projects\stockMgmt
+
+   # Only if using XAMPP:
+   $env:Path = "C:\xampp\php;C:\xampp\mysql\bin;$env:Path"
+
+   php -v
+   mysql --version
+   ```
+
+   For other installations, use their PHP and MySQL installation folders instead.
+
+2. Create a new development database and import the bundled snapshot:
+
+   ```powershell
+   mysql -u root -p -e "CREATE DATABASE karyasetu_dev CHARACTER SET utf8mb4;"
+   cmd /c "mysql -u root -p karyasetu_dev < database\sms_db.sql"
+   ```
+
+   Enter the database password when prompted, or press Enter if it is blank.
+   The import uses `cmd /c` because PowerShell does not support this form of input
+   redirection. Use a new database, never a live business database. The bundled
+   SQL contains store data; keep it private and use it for testing, not as a clean
+   production database. Do not repeat the import when restarting the app.
+
+3. Configure and start the application in the same PowerShell window:
+
+   ```powershell
+   $env:DB_HOST = "127.0.0.1"
+   $env:DB_PORT = "3306"
+   $env:DB_USER = "root"
+   $env:DB_PASSWORD = "YOUR_MYSQL_PASSWORD"
+   $env:DB_NAME = "karyasetu_dev"
+   $env:APP_TIMEZONE = "Asia/Kathmandu"
+   $env:APP_BASE_URL = "http://127.0.0.1:8080/"
+
+   php database/migrate.php
+   php -S 127.0.0.1:8080 router.php
+   ```
+
+   Replace `YOUR_MYSQL_PASSWORD` with the local database password; use `""` if
+   it is blank. Set `DB_USER` to the local database username if it is not `root`.
+   Stop if migration reports an error and resolve it before starting the server.
+   Environment variables apply to this terminal session; `.env` files are not
+   loaded automatically.
+
+4. Open <http://127.0.0.1:8080/admin/> and use the bundled test login:
+
+   - Username: `admin`
+   - Password: `admin123`
+
+   Change the password immediately. Keep PowerShell open while using the app;
+   press Ctrl+C to stop it. In a new terminal, repeat the project-directory/PATH
+   setup and step 3, without recreating or importing the database. If port 8080
+   is occupied, change it to 8082 in both `APP_BASE_URL` and `php -S`, then open
+   the matching browser URL. The development server is for local use only, not
+   public hosting.
+
+### Upgrade Notes
 
 Run `php database/migrate.php` once after upgrading an existing installation or
 restoring the bundled backup. It adds missing audit, return-unit, and
@@ -214,9 +296,9 @@ receives two deliveries as staff, rejects a duplicate invoice, and checks print,
 item controls, navigation, and desktop/mobile layout. Its browser users exist only
 in the disposable database. No additional packages are required.
 
-## Friend-Version Feature Merge
+## V3 Update
 
-Migration `003_friend_features` adds an executive dashboard with saved preferences,
+Migration 003 adds an executive dashboard with saved preferences,
 location stock and transfers, case packaging/barcodes, scheduled promotions,
 individual POS receipts, activities/calendar, custom roles, fiscal-year controls,
 return-credit allocation, local draft interpretation, and a searchable 54-report
@@ -227,7 +309,7 @@ Legacy stock defaults to Main Store. Existing documents are neither imported fro
 the archive nor automatically posted/revalued. Posted-ledger financial reports
 remain distinct from operational reports. Keep the private pre-upgrade backup.
 
-See [the comparison and delivery notes](docs/FRIEND_VERSION_MERGE.md) for test
+See [the V3 Update notes and remaining work](docs/V3_UPDATE.md) for test
 commands, exact adaptations, and deliberate exclusions. These include unsafe
 archive password resets/SQL restore, unverified payment QR details, provider-based
 automatic messaging, standalone non-return credits, and mixed per-line VAT.

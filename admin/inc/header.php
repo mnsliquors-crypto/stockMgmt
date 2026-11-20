@@ -6,8 +6,9 @@
     <meta charset="utf-8">
     <meta name="csrf-token" content="<?php echo htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-  	<title><?php echo $_settings->info('title') != false ? $_settings->info('title').' | ' : '' ?><?php echo $_settings->info('name') ?></title>
-    <link rel="icon" href="<?php echo validate_image($_settings->info('logo')) ?>" />
+    <title><?php echo htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?></title>
+    <meta name="application-name" content="<?php echo htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?>">
+    <link rel="icon" type="image/jpeg" href="<?php echo base_url.APP_LOGO ?>">
     <!-- Google Font: Source Sans Pro -->
     <!-- <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&amp;display=fallback"> -->
     <!-- Font Awesome -->
@@ -33,6 +34,7 @@
     <link rel="stylesheet" href="<?php echo base_url ?>dist/css/custom.css?v=<?php echo time() ?>">
     <link rel="stylesheet" href="<?php echo base_url ?>dist/css/searchable-select.css?v=<?php echo time() ?>">
     <?php if (!empty($enterprise_available)): ?><link rel="stylesheet" href="<?php echo base_url ?>dist/css/enterprise.css?v=1"><?php endif ?>
+    <link rel="stylesheet" href="<?php echo base_url ?>dist/css/compact-erp.css?v=<?php echo filemtime(base_app.'dist/css/compact-erp.css') ?>">
 
     <!-- overlayScrollbars -->
     <link rel="stylesheet" href="<?php echo base_url ?>plugins/overlayScrollbars/css/OverlayScrollbars.min.css">

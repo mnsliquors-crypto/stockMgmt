@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html lang="en" class="" style="height: auto;">
  <?php require_once('inc/header.php') ?>
-<body class="hold-transition bg-light">
+<body class="hold-transition bg-light erp-login">
   <script>
     start_loader()
   </script>
@@ -274,57 +274,29 @@
 
 <div class="main-wrapper">
   <div class="brand-logo">
-    <h2><i class="fas fa-boxes"></i> <?php echo $_settings->info('name') ?></h2>
+    <?php require __DIR__.'/inc/app_brand.php'; ?>
+    <h1 class="sr-only"><?php echo htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?></h1>
   </div>
 
   <div class="login-container">
-    <!-- Left Information Panel -->
-    <div class="login-left">
-      <h3>Messages for Beacon</h3>
-      <div class="testimonial-card">
-        <div class="author">Admin Team</div>
-        <p>Just checking in to see how things are going. We're around to chat if you need any assistance...</p>
-        <div class="avatar">
-           <img src="<?php echo validate_image($_settings->info('logo')) ?>" alt="Avatar" onerror="this.src='<?php echo base_url ?>uploads/logo.png'">
-        </div>
-      </div>
-      <div class="learn-more">
-        <a href="#">Learn More</a>
-      </div>
-    </div>
-    
-    <!-- Right Login Form Panel -->
     <div class="login-right">
-      <h2>Log In</h2>
+      <h2>Sign In</h2>
       <form id="login-frm" action="" method="post">
         <div class="form-group">
-          <input type="text" class="form-control" autofocus name="username" placeholder="Username">
+          <label for="login-username">Username</label>
+          <input type="text" class="form-control" id="login-username" autofocus name="username" placeholder="Username" autocomplete="username" required>
         </div>
         <div class="form-group">
-          <input type="password" class="form-control" name="password" placeholder="Password">
+          <label for="login-password">Password</label>
+          <input type="password" class="form-control" id="login-password" name="password" placeholder="Password" autocomplete="current-password" required>
         </div>
-        <div class="custom-control">
-          <input type="checkbox" class="custom-control-input" id="rememberMe" checked>
-          <label class="custom-control-label" for="rememberMe">Remember me for 30 days</label>
-        </div>
-        <button type="submit" class="btn btn-primary">Log In</button>
+        <button type="submit" class="btn btn-primary">Sign In</button>
       </form>
-      
-      <div class="divider">or</div>
-      
-      <button type="button" class="btn-google">
-        <i class="fab fa-google" style="color: #db4437;"></i> Loading...
-      </button>
-
-      <div class="forgot-password">
-        <a href="#">Forgot your password?</a>
-      </div>
+      <p class="login-assistance">Contact your administrator for password assistance.</p>
     </div>
   </div>
 
-  <div class="footer-text">
-    Looking for a better way to talk with customers? <a href="#">Try <?php echo $_settings->info('name') ?></a>
-  </div>
+  <footer class="login-footer"><?php require __DIR__.'/inc/copyright.php'; ?></footer>
 </div>
 
 <!-- Bootstrap 4 -->

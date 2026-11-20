@@ -1,7 +1,7 @@
 <?php
 if (!isset($conn)) require_once __DIR__.'/../../../config.php';
-if (!$conn->query("SELECT version FROM erp_schema_versions WHERE version='003_friend_features'")->num_rows) {
-    http_response_code(503);echo '<div class="alert alert-info">Workspace upgrade is pending.</div>';return;
+if (!$conn->query("SELECT version FROM erp_schema_versions WHERE version='".ERP_V3_SCHEMA_VERSION."'")->num_rows) {
+    http_response_code(503);echo '<div class="alert alert-info">V3 Update is pending.</div>';return;
 }
 require_once base_app.'classes/Enterprise/WorkspaceService.php';
 require_once base_app.'classes/Enterprise/InventoryService.php';

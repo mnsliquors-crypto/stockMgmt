@@ -1,6 +1,6 @@
 {
-  "name": "sms/app",
-  "description": "Simple SMS app - test scaffold",
+  "name": "karyasetu/enterprise-platform",
+  "description": "Karyasetu Enterprise Platform - inventory, purchasing, and accounting",
   "require": {
     "php": ">=8.1",
     "ext-mysqli": "*",

@@ -123,7 +123,7 @@ while($row = $accounts->fetch_assoc()){
 
                         </div>
                         
-                        <div class="row align-items-end mb-2" style="background: #e9ecef; padding: 10px; border-radius: 5px;">
+                        <div class="row align-items-end mb-2 pos-item-picker" style="background: #e9ecef; padding: 10px; border-radius: 5px;">
                             <div class="col-md-6">
                                 <label class="text-xs mb-0">Search Item / Barcode</label>
                                 <div id="item_ss" 

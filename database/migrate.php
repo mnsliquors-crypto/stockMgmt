@@ -30,6 +30,6 @@ require_once __DIR__ . '/migrations/001_accounting.php';
 migrate_accounting($db->conn);
 require_once __DIR__ . '/migrations/002_procurement.php';
 migrate_procurement($db->conn);
-require_once __DIR__ . '/migrations/003_friend_features.php';
-migrate_friend_features($db->conn);
+require_once __DIR__ . '/migrations/003_v3_update.php';
+migrate_v3_update($db->conn);
 echo "Schema is up to date.\n";

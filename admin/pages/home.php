@@ -1,5 +1,5 @@
 <?php
-if (!$conn->query("SELECT version FROM erp_schema_versions WHERE version='003_friend_features'")->num_rows) {
+if (!$conn->query("SELECT version FROM erp_schema_versions WHERE version='".ERP_V3_SCHEMA_VERSION."'")->num_rows) {
     require __DIR__.'/legacy_dashboard.php';
     return;
 }

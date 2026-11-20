@@ -1,7 +1,7 @@
 <?php
 
-function migrate_friend_features(mysqli $conn): void {
-    if ($conn->query("SELECT 1 FROM erp_schema_versions WHERE version='003_friend_features'")->num_rows) return;
+function migrate_v3_update(mysqli $conn): void {
+    if ($conn->query("SELECT 1 FROM erp_schema_versions WHERE version='".ERP_V3_SCHEMA_VERSION."'")->num_rows) return;
     $ddl = [
         "CREATE TABLE IF NOT EXISTS erp_locations (
             id INT AUTO_INCREMENT PRIMARY KEY, code VARCHAR(30) NOT NULL UNIQUE, name VARCHAR(120) NOT NULL,
@@ -163,6 +163,6 @@ function migrate_friend_features(mysqli $conn): void {
             $conn->query("CREATE TRIGGER $name BEFORE $event ON $table FOR EACH ROW BEGIN IF $condition THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Posted document and submitted order metadata is immutable.'; END IF; END");
         }
     }
-    $conn->query("INSERT INTO erp_schema_versions(version) VALUES ('003_friend_features')");
-    echo "Applied locations, packaging, promotions, activities, preferences, roles, and fiscal-year metadata.\n";
+    $conn->query("INSERT INTO erp_schema_versions(version) VALUES ('".ERP_V3_SCHEMA_VERSION."')");
+    echo "Applied V3 Update: locations, packaging, promotions, activities, preferences, roles, and fiscal-year metadata.\n";
 }

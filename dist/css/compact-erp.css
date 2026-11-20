@@ -1,0 +1,274 @@
+:root {
+    --erp-accent:#087f75;
+    --erp-accent-hover:#06665e;
+    --erp-accent-soft:#e7f3f0;
+    --erp-text:#263238;
+    --erp-muted:#647176;
+    --erp-line:#dce3e5;
+    --erp-bg:#f3f5f6;
+    --erp-surface:#fff;
+    --erp-nav:#273638;
+    --ns-navy:var(--erp-text);
+    --ns-blue:var(--erp-accent);
+    --ns-bg:var(--erp-bg);
+    --ns-border:var(--erp-line);
+    --ns-menu-bg:var(--erp-nav);
+    --ns-text:var(--erp-text);
+    --ns-muted:var(--erp-muted);
+    --primary:var(--erp-accent);
+    --info:var(--erp-accent);
+    --font-family-sans-serif:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+}
+
+body.erp-app, body.erp-login {
+    font-family:var(--font-family-sans-serif);
+    font-size:13px;
+    line-height:1.4;
+    letter-spacing:0;
+    color:var(--erp-text);
+    background:var(--erp-bg)!important;
+}
+body.erp-app *, body.erp-login * { letter-spacing:0!important; }
+body.erp-app a, body.erp-login a { color:var(--erp-accent); }
+body.erp-app a:hover, body.erp-login a:hover { color:var(--erp-accent-hover); }
+body.erp-app :focus-visible, body.erp-login :focus-visible { outline:2px solid var(--erp-accent); outline-offset:2px; }
+body.erp-app .text-primary, body.erp-app .text-info { color:var(--erp-accent)!important; }
+body.erp-app .text-muted, body.erp-app .text-secondary { color:var(--erp-muted)!important; }
+body.erp-app .bg-primary, body.erp-app .bg-info { background:var(--erp-accent)!important; color:#fff!important; }
+body.erp-app .bg-light { background:#f6f8f8!important; }
+body.erp-app .text-danger { color:#ad3d4e!important; }
+body.erp-app .text-success { color:#26734f!important; }
+body.erp-app .border-primary, body.erp-app .border-info { border-color:var(--erp-accent)!important; }
+
+body.erp-app .erp-header-top { height:42px; padding:0 16px; gap:16px; }
+body.erp-app .ns-logo { gap:8px; font-size:15px; color:var(--erp-text); }
+body.erp-app .ns-logo img { height:24px; width:24px; object-fit:contain; }
+.karyasetu-logo { display:block; position:relative; overflow:hidden; width:176px; aspect-ratio:4.4; flex-shrink:0; background:#fff; }
+body.erp-app .ns-logo .karyasetu-logo>img, body.erp-login .brand-logo .karyasetu-logo>img { position:absolute; width:140%; height:auto; max-width:none; left:-20%; top:50%; transform:translateY(-50%); }
+body.erp-app .ns-logo { flex-shrink:0; }
+body.erp-app .ns-search { flex-basis:440px; }
+body.erp-app .ns-search input { height:28px; font-size:12px; background:#f7f9f9; }
+body.erp-app .header-right { gap:14px!important; }
+body.erp-app .header-right .user-avatar { width:26px!important; height:26px!important; }
+body.erp-app .header-right .user-profile { gap:8px!important; }
+body.erp-app #globalCreateNew { width:28px!important; height:28px!important; border-radius:4px!important; box-shadow:none!important; }
+body.erp-app #globalCreateNew i { color:#fff; }
+body.erp-app .erp-nav-bar { height:34px; padding:0 16px; background:var(--erp-nav); box-shadow:none; }
+body.erp-app .ns-menu-link { padding:0 14px; font-size:12px; color:#eef4f3; }
+body.erp-app .ns-menu-item.active>.ns-menu-link { background:#3d5051; box-shadow:inset 0 -2px #6dccb7; }
+body.erp-app .ns-menu-link:hover { background:#35494a; color:#fff; }
+body.erp-app .ns-dropdown { padding:4px 0; border-color:var(--erp-line); }
+body.erp-app .ns-dropdown-link { padding:7px 12px; font-size:12px; color:var(--erp-text); }
+body.erp-app .ns-dropdown-link:hover, body.erp-app .ns-has-sub.ns-sub-open>a { background:var(--erp-accent-soft); color:var(--erp-accent); }
+body.erp-app .ns-page-header { min-height:44px; padding:7px 16px; gap:12px; }
+body.erp-app .ns-page-header .left-ctx { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 14px; min-width:0; }
+body.erp-app .ns-page-title { font-size:17px; line-height:1.3; overflow-wrap:anywhere; }
+body.erp-app .ns-breadcrumbs { font-size:11px!important; margin-top:0!important; }
+body.erp-app .ns-btn { padding:4px; width:28px; height:28px; font-size:12px; }
+body.erp-app .erp-main { padding:0 16px 14px; min-width:0; }
+body.erp-app .erp-main { display:flex; flex-direction:column; }
+body.erp-app .erp-main>.content { flex:1; min-width:0; }
+body.erp-app .erp-main>.content>.container-fluid { padding:0; }
+body.erp-app .erp-footer { padding:9px 16px; font-size:11px; }
+body.erp-app .erp-footer { align-items:center; gap:8px 16px; margin-top:14px; flex-shrink:0; }
+.app-copyright { overflow-wrap:anywhere; }
+.erp-release { display:inline-block; margin-left:9px; padding-left:9px; border-left:1px solid var(--erp-line); white-space:nowrap; }
+
+body.erp-app h4 { font-size:18px; }
+body.erp-app h5 { font-size:15px; }
+body.erp-app h6 { font-size:13px; }
+body.erp-app .card { border-color:var(--erp-line)!important; margin-bottom:12px; box-shadow:none!important; }
+body.erp-app .card.card-outline { border-top:2px solid var(--erp-accent)!important; }
+body.erp-app .erp-main>.content>.container-fluid>.card { border:0!important; border-radius:0!important; }
+body.erp-app .card-header { padding:8px 12px!important; background:var(--erp-surface)!important; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+body.erp-app .card-header::after { display:none; }
+body.erp-app .card-title { font-size:14px!important; text-transform:none; }
+body.erp-app .card-tools { display:flex; align-items:center; flex-wrap:wrap; gap:5px; margin:0; }
+body.erp-app .card-body { padding:12px; min-width:0; }
+body.erp-app .card-body>.container-fluid { padding:0; }
+body.erp-app .card-footer { padding:8px 12px; background:#fafcfc; }
+body.erp-app .form-group { margin-bottom:10px; }
+body.erp-app label { font-size:12px; font-weight:600; margin-bottom:3px; }
+body.erp-app .form-control, body.erp-app .custom-select { height:30px; padding:4px 8px; font-size:13px; border-color:#cbd5d8; border-radius:4px!important; box-shadow:none; }
+body.erp-app textarea.form-control { height:auto; min-height:68px; }
+body.erp-app input[type="file"].form-control { height:auto; }
+body.erp-app .form-control:focus { border-color:var(--erp-accent); box-shadow:0 0 0 2px #087f751a; }
+body.erp-app .input-group-text { padding:4px 8px; font-size:12px; background:#f0f4f4; border-color:#cbd5d8; }
+body.erp-app .select2-container .select2-selection--single { height:30px; border:1px solid #cbd5d8; border-radius:4px; }
+body.erp-app .select2-container .select2-selection__rendered { line-height:28px; padding-left:8px; font-size:13px; }
+body.erp-app .select2-container .select2-selection__arrow { height:28px; }
+body.erp-app .select2-container { max-width:100%; }
+body.erp-app .btn, body.erp-login .btn-primary { border-radius:4px!important; font-size:12px; font-weight:600; padding:5px 9px; line-height:1.4; box-shadow:none!important; text-shadow:none; }
+body.erp-app .btn-primary, body.erp-app .btn-success, body.erp-login .btn-primary { background:var(--erp-accent)!important; border-color:var(--erp-accent)!important; color:#fff!important; }
+body.erp-app .btn-primary:hover, body.erp-app .btn-success:hover, body.erp-login .btn-primary:hover { background:var(--erp-accent-hover)!important; border-color:var(--erp-accent-hover)!important; }
+body.erp-app .btn-info, body.erp-app .btn-outline-primary, body.erp-app .btn-outline-info, body.erp-app .btn-outline-success { color:var(--erp-accent)!important; border-color:#8cbab3!important; background:transparent!important; }
+body.erp-app .btn-info:hover, body.erp-app .btn-outline-primary:hover, body.erp-app .btn-outline-info:hover, body.erp-app .btn-outline-success:hover { background:var(--erp-accent-soft)!important; }
+body.erp-app .btn-secondary { background:#556368; border-color:#556368; color:#fff; }
+body.erp-app .btn-danger { background:#ad3d4e; border-color:#ad3d4e; color:#fff; }
+body.erp-app .btn-outline-danger { color:#ad3d4e; border-color:#cd9aa3; }
+body.erp-app .btn-link { color:var(--erp-accent); }
+body.erp-app .btn-outline-secondary { color:#526166; border-color:#bcc9cd; }
+body.erp-app .btn-warning { background:#f6e7c2; color:#75520e; border-color:#dbc18e; }
+body.erp-app .btn:hover { transform:none!important; }
+body.erp-app .nav-link { padding:6px 11px; font-size:12px; }
+body.erp-app .nav-tabs { border-color:var(--erp-line); }
+body.erp-app .nav-tabs .nav-link.active { color:var(--erp-accent); font-weight:600; border-top:2px solid var(--erp-accent); }
+body.erp-app .table { font-size:13px; margin-bottom:10px; color:var(--erp-text); }
+body.erp-app .table th, body.erp-app .table td { padding:5px 8px; border-color:var(--erp-line); vertical-align:middle; }
+body.erp-app table.dataTable th, body.erp-app table.dataTable td { padding:5px 8px!important; }
+body.erp-app .table thead th, body.erp-app .table .thead-light th { color:#536369; background:#f0f4f4; font-size:11px; font-weight:600; border-bottom-width:1px; }
+body.erp-app .table-striped tbody tr:nth-of-type(odd) { background:#f8fafa; }
+body.erp-app .badge { padding:3px 6px; font-size:11px; font-weight:600; border-radius:3px; box-shadow:none!important; }
+body.erp-app .badge-primary, body.erp-app .badge-info { color:#086d64; background:#e0f0ec; }
+body.erp-app .badge-success { color:#23613f; background:#e6f2ea; }
+body.erp-app .badge-warning { color:#795b16; background:#faf0d7; }
+body.erp-app .badge-danger { color:#9e3345; background:#f8e8eb; }
+body.erp-app .badge-secondary { color:#556368; background:#e9edef; }
+body.erp-app .table td.text-right .badge { background:transparent; padding:0; color:inherit; font-size:inherit; font-weight:500; }
+body.erp-app .table td.text-right .badge-danger { color:#ad3d4e; }
+body.erp-app .page-item.active .page-link { background:var(--erp-accent); border-color:var(--erp-accent); color:#fff; }
+body.erp-app .page-link { padding:5px 9px; font-size:12px; color:var(--erp-accent); }
+body.erp-app .dataTables_wrapper { min-width:0; }
+body.erp-app .dataTables_wrapper>.row { margin-right:0; margin-left:0; }
+body.erp-app .dataTables_wrapper>.row>.col-sm-12 { padding-right:0; padding-left:0; min-width:0; }
+body.erp-app .dataTables_wrapper>.row:nth-child(2)>.col-sm-12 { overflow-x:auto; }
+body.erp-app .dataTables_info { padding-top:5px; font-size:12px; }
+body.erp-app .modal-header, body.erp-app .modal-footer { padding:10px 14px; }
+body.erp-app .modal-title { font-size:16px; }
+body.erp-app .alert { padding:8px 12px; font-size:12px; }
+
+body.erp-app .suite-workspace { --suite-text:var(--erp-text); --suite-muted:var(--erp-muted); --suite-line:var(--erp-line); --suite-soft:#edf3f2; padding-top:12px!important; padding-bottom:8px!important; }
+body.erp-app .suite-workspace h4 { font-size:18px; }
+body.erp-app .suite-workspace h5 { font-size:14px; margin-bottom:9px; }
+body.erp-app .suite-workspace .mb-3, body.erp-app .accounting-workspace .mb-3, body.erp-app .procurement-workspace .mb-3 { margin-bottom:10px!important; }
+body.erp-app .suite-heading { gap:8px; }
+body.erp-app #executive-dashboard>.suite-heading>div:first-child { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 12px; }
+body.erp-app .suite-filter { gap:8px; padding-bottom:10px; margin-bottom:10px; }
+body.erp-app .suite-filter>div { flex-basis:180px; min-width:140px; }
+body.erp-app .suite-filter .btn { height:30px; }
+body.erp-app .suite-shortcuts { gap:3px; padding:5px 0; margin-bottom:10px!important; border-top:0; }
+body.erp-app .suite-shortcuts a { min-height:28px; padding:4px 9px; font-size:12px; color:var(--erp-muted); }
+body.erp-app .suite-shortcuts i { color:var(--erp-accent); }
+body.erp-app .suite-kpis { gap:8px; margin-bottom:14px; }
+body.erp-app .suite-kpi { display:grid; grid-template-columns:minmax(0,1fr) auto; align-content:center; align-items:baseline; gap:5px 4px; min-height:76px; padding:9px 10px; border-top:2px solid var(--erp-accent); }
+body.erp-app .suite-kpi:nth-child(n) { border-top-color:var(--erp-accent); }
+body.erp-app .suite-kpi-label { grid-column:1/-1; min-height:16px; gap:6px; line-height:1.3; font-size:11px; }
+body.erp-app .suite-kpi strong { font-size:19px; line-height:1.2; }
+body.erp-app .suite-kpi-currency { font-size:10px; }
+body.erp-app .suite-dashboard-grid { gap:16px; }
+body.erp-app .suite-panel { padding-top:10px; }
+body.erp-app .suite-chart { height:186px; }
+body.erp-app .suite-panel .suite-heading { margin-bottom:8px; }
+body.erp-app .suite-account-values { gap:10px; margin:8px 0; }
+body.erp-app .suite-account-values>div:nth-child(n) { border-color:var(--erp-accent); padding:2px 9px; }
+body.erp-app .suite-account-values dd { font-size:18px; margin-top:4px; }
+body.erp-app .suite-definition { gap:6px 10px; }
+body.erp-app .suite-task { padding:6px 0; }
+body.erp-app .suite-report-layout { grid-template-columns:200px minmax(0,1fr); gap:16px; }
+body.erp-app .suite-report-group { padding-bottom:10px; }
+body.erp-app .suite-report-link { padding:4px 7px; font-size:12px; }
+body.erp-app .suite-report-filters { gap:8px; margin-bottom:10px; padding-bottom:10px; }
+body.erp-app .suite-report-directory { gap:14px; }
+body.erp-app .suite-report-basis { line-height:1.4; margin-bottom:8px; }
+body.erp-app .accounting-workspace, body.erp-app .procurement-workspace { padding-top:10px!important; }
+body.erp-app .erp-location-control { display:flex; align-items:center; gap:8px; max-width:300px; margin-bottom:10px; }
+body.erp-app .erp-location-control label { margin:0; white-space:nowrap; }
+body.erp-app #pos-form { --pos-primary:var(--erp-accent); --pos-success:var(--erp-accent); --pos-dark:var(--erp-nav); }
+body.erp-app .pos-item-picker { display:grid; grid-template-columns:minmax(0,1fr) 80px 90px 80px; gap:8px; margin:0!important; padding:8px!important; background:#edf3f2!important; border-radius:4px!important; }
+body.erp-app .pos-item-picker>div { max-width:none; width:auto; min-width:0; padding:0; }
+body.erp-app #pos-cart-container { height:clamp(240px,46vh,480px); border-radius:4px; box-shadow:none; }
+body.erp-app #pos-cart-table th, body.erp-app #pos-cart-table td { padding:6px 8px; font-size:12px; }
+body.erp-app #pos-cart-table th { background:#edf3f2; color:#526367; }
+body.erp-app .pos-right-panel { padding:12px; border-left:0; }
+body.erp-app .pos-right-panel>h5 { font-size:12px; text-align:left!important; margin-bottom:6px!important; }
+body.erp-app .pos-total-display { padding:10px 12px; min-height:58px; font-family:var(--font-family-sans-serif); font-variant-numeric:tabular-nums; font-size:28px; line-height:1.3; background:var(--erp-accent-soft); color:#126658; border:1px solid #c5dfd7; border-radius:4px; box-shadow:none; text-shadow:none; margin-bottom:12px!important; overflow-wrap:anywhere; }
+body.erp-app .pos-return-display { font-size:20px!important; color:var(--erp-text); text-shadow:none; }
+body.erp-app .payment-row { border:0!important; border-bottom:1px solid var(--erp-line)!important; border-radius:0!important; box-shadow:none!important; background:transparent!important; padding:6px 0!important; }
+body.erp-app .payment-row .paid-amount-input { font-size:15px!important; }
+body.erp-app #pos-form button[form="pos-form"][type="submit"] { padding:9px 12px!important; margin-top:10px!important; font-size:14px!important; min-height:40px; border-radius:4px!important; }
+body.erp-app .suite-workspace[data-theme="dark"] { --suite-bg:#222d2f; --suite-text:#e8efef; --suite-muted:#b4c3c5; --suite-line:#435759; --suite-soft:#2d3b3e; --erp-accent:#69c4b3; --erp-accent-soft:#2c4542; padding:12px; }
+body.erp-app .suite-workspace[data-theme="dark"] .table { color:var(--suite-text); }
+body.erp-app .suite-workspace[data-theme="dark"] .table-striped tbody tr:nth-of-type(odd), body.erp-app .suite-workspace[data-theme="dark"] .table thead th { background:#2b3b3d; color:#d3e1e0; }
+body.erp-app .suite-workspace[data-theme="dark"] .form-control { color:var(--suite-text); border-color:var(--suite-line); }
+body.erp-app .suite-workspace[data-theme="dark"] a:not(.btn) { color:#8fd8c9; }
+body.erp-app .suite-workspace[data-theme="dark"] .btn-primary, body.erp-app .suite-workspace[data-theme="dark"] .btn-success { background:#087f75!important; border-color:#087f75!important; }
+body.erp-app .suite-workspace[data-theme="dark"] { color-scheme:dark; }
+body.erp-app .suite-workspace[data-theme="dark"] .suite-shortcuts a { color:var(--suite-text); }
+body.erp-app .suite-workspace[data-theme="dark"] .btn-outline-secondary { color:var(--suite-muted); border-color:var(--suite-line); }
+body.erp-app .suite-workspace[data-theme="dark"] .select2-selection__placeholder { color:var(--suite-muted); }
+body.erp-app .suite-workspace[data-theme="dark"] .modal-content { background:var(--suite-bg); color:var(--suite-text); }
+body.erp-app .suite-workspace[data-theme="dark"] .modal-header, body.erp-app .suite-workspace[data-theme="dark"] .modal-footer { border-color:var(--suite-line); }
+body.erp-login .brand-logo { margin-bottom:18px; }
+body.erp-login .brand-logo h2 { color:var(--erp-accent); font-size:22px; }
+body.erp-login .login-container { width:360px; min-height:0; max-width:94%; border-radius:6px; box-shadow:none; border:1px solid var(--erp-line); }
+body.erp-login .brand-logo .karyasetu-logo { width:280px; max-width:90vw; }
+body.erp-login .main-wrapper { padding:20px 0; }
+body.erp-login { height:auto; min-height:100vh; min-height:100dvh; }
+body.erp-login .login-right label { font-size:12px; font-weight:600; }
+body.erp-login .login-assistance { font-size:12px; line-height:1.5; color:var(--erp-muted); text-align:center; margin:16px 0 0; }
+body.erp-login .login-footer { max-width:94%; margin-top:20px; color:var(--erp-muted); text-align:center; font-size:11px; }
+body.erp-login .login-left { padding:28px; }
+body.erp-login .login-right { padding:28px 36px; }
+body.erp-login .login-right h2 { font-size:19px; margin-bottom:20px; }
+body.erp-login .form-group { margin-bottom:14px; }
+body.erp-login .form-control { height:38px; padding:7px 10px; }
+body.erp-login .form-control:focus { border-color:var(--erp-accent); box-shadow:0 0 0 2px #087f751a; }
+
+@media (max-width:991px) {
+    body.erp-app .erp-header-top { height:auto; min-height:42px; padding:6px 12px; gap:6px 12px; }
+    body.erp-app .ns-search { flex-basis:100%; }
+    body.erp-app .erp-nav-bar { padding:0 8px; }
+    body.erp-app .ns-menu-link { min-height:40px; }
+    body.erp-app .ns-menu-item.active>.ns-menu-link { box-shadow:none; }
+    body.erp-app .erp-main { padding-right:12px; padding-left:12px; }
+    body.erp-app .card-tools .btn { min-height:30px; }
+    body.erp-app .suite-report-layout { grid-template-columns:175px minmax(0,1fr); }
+}
+@media (max-width:767px) {
+    body.erp-app .erp-header-top { padding:6px 10px; }
+    body.erp-app .ns-logo .karyasetu-logo { width:160px; }
+    body.erp-app .erp-footer { flex-direction:column; text-align:center; padding:10px 0; }
+    body.erp-app .ns-search input { height:32px; }
+    body.erp-app .erp-main { padding-right:10px; padding-left:10px; }
+    body.erp-app .ns-page-header { padding:6px 10px; }
+    body.erp-app .ns-breadcrumbs { display:none; }
+    body.erp-app .ns-page-title { font-size:16px; }
+    body.erp-app .card-body { padding:10px; }
+    body.erp-app .card-tools .btn, body.erp-app .suite-actions .btn { min-height:34px; }
+    body.erp-app .form-control, body.erp-app .custom-select { height:34px; font-size:14px; }
+    body.erp-app .select2-container .select2-selection--single { height:34px; }
+    body.erp-app .select2-container .select2-selection__rendered { line-height:32px; }
+    body.erp-app .select2-container .select2-selection__arrow { height:32px; }
+    body.erp-app .suite-workspace { padding-top:10px!important; }
+    body.erp-app .suite-workspace h4 { font-size:17px; }
+    body.erp-app .suite-kpi { min-height:72px; padding:8px; gap:4px; }
+    body.erp-app .suite-kpi strong { font-size:18px; }
+    body.erp-app .suite-kpi-label { min-height:26px; }
+    body.erp-app .suite-kpis { gap:6px; }
+    body.erp-app .suite-filter>div { min-width:0; flex:1 1 140px; }
+    body.erp-app .suite-filter .btn { height:34px; }
+    body.erp-app .suite-shortcuts { gap:2px; }
+    body.erp-app .suite-shortcuts a { min-height:32px; padding:4px 8px; }
+    body.erp-app .suite-chart { height:176px; }
+    body.erp-app .suite-report-layout { grid-template-columns:minmax(0,1fr); }
+    body.erp-app .suite-report-nav { max-height:150px; padding-right:0; }
+    body.erp-app .suite-account-values dd { font-size:17px; }
+    body.erp-app #pos-cart-container { height:220px; margin-bottom:12px; }
+    body.erp-app .pos-item-picker { grid-template-columns:minmax(0,1fr) minmax(0,1fr) 80px; }
+    body.erp-app .pos-item-picker>div:first-child { grid-column:1/-1; }
+    body.erp-app .pos-item-picker button { min-height:34px; }
+    body.erp-app .pos-right-panel { padding:10px; }
+    body.erp-app #pos-form button[form="pos-form"][type="submit"] { min-height:44px; }
+    body.erp-login .login-left { display:none; }
+    body.erp-login .login-container { width:360px; min-height:0; }
+    body.erp-login .login-right { padding:24px; }
+}
+@media print {
+    body.erp-app { background:white!important; color:#111; }
+    body.erp-app .suite-workspace[data-theme="dark"] { --suite-bg:#fff; --suite-text:#111; --suite-muted:#444; --suite-line:#ddd; --suite-soft:#fff; color-scheme:light; }
+    body.erp-app .suite-workspace[data-theme="dark"] .table-striped tbody tr:nth-of-type(odd), body.erp-app .suite-workspace[data-theme="dark"] .table thead th { background:#fff; color:#111; }
+    body.erp-app .erp-header-top, body.erp-app .erp-nav-bar, body.erp-app .ns-page-header { display:none!important; }
+    body.erp-app .erp-main { padding:0; }
+    body.erp-app .table { font-size:11px; }
+    body.erp-app .table thead th { color:#222; }
+}

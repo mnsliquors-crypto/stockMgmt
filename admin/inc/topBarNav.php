@@ -1,13 +1,9 @@
 <?php
 $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 ?>
-<!-- NetSuite Layer 1: Branding & Profile -->
+<!-- Application branding and profile -->
 <div class="erp-header-top">
-    <div class="ns-logo">
-        <?php $brandLogo=validate_image($_settings->info('logo'));if(!empty($enterprise_available)&&str_contains($brandLogo,'no-image-available'))$brandLogo=base_url.'dist/img/mns-liquors-logo.jpg'; ?>
-        <img src="<?php echo htmlspecialchars($brandLogo,ENT_QUOTES,'UTF-8') ?>" alt="MNS Liquors logo">
-        <span>MNS LIQUORS</span>
-    </div>
+    <a class="ns-logo" href="<?php echo base_url ?>admin/" aria-label="<?php echo htmlspecialchars(APP_NAME, ENT_QUOTES, 'UTF-8') ?> home"><?php require __DIR__.'/app_brand.php'; ?></a>
 
     <div class="ns-search d-flex align-items-center" style="gap: 15px;">
         <div style="position:relative; flex-grow:1;">
@@ -197,6 +193,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 </nav>
 
 <!-- Contextual Page Header (NetSuite Style Title Bar) -->
+<?php if($page!=='home'&&!str_starts_with($page,'enterprise/')&&!str_starts_with($page,'finance/accounting')&&!str_starts_with($page,'transactions/procurement')): ?>
 <div class="ns-page-header">
     <div class="left-ctx">
         <h1 class="ns-page-title"><?php echo ucwords(str_replace(['_', '/'], [' ', ' &bull; '], $page)) ?></h1>
@@ -208,6 +205,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
         <button class="ns-btn" onclick="location.reload()" title="Refresh Page"><i class="fas fa-sync-alt"></i></button>
     </div>
 </div>
+<?php endif ?>
 
 <script>
 $(document).ready(function(){
@@ -216,6 +214,7 @@ $(document).ready(function(){
     ?>
     const navPermissions=<?php echo json_encode($navPermissions) ?>,routeScopes=<?php echo json_encode(App\Enterprise\Access::PAGE_SCOPES) ?>,navAdmin=<?php echo (int)$_settings->userdata('type')===1?'true':'false' ?>;
     $('.erp-header-top a,.erp-nav-bar a,.suite-shortcuts a').each(function(){
+        if(this.classList.contains('ns-logo'))return;
         const url=new URL(this.href,location.href);if(url.origin!==location.origin||this.getAttribute('href')==='#')return;
         const page=url.searchParams.get('page')||(url.pathname.replace(/\/$/,'')===new URL(_base_url_+'admin').pathname?'home':null);if(!page)return;
         if(page.startsWith('system/')&&page!=='system/users/profile'&&!navAdmin){this.remove();return;}

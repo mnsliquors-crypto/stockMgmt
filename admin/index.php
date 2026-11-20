@@ -2,7 +2,7 @@
  <!DOCTYPE html>
 <html lang="en" class="" style="height: auto;">
 <?php require_once('inc/header.php') ?>
-  <body class="hold-transition">
+  <body class="hold-transition erp-app">
     <div class="erp-wrapper">
      <?php require_once('inc/topBarNav.php') ?>
      <main class="erp-main" style="margin-left: 0 !important; width: 100% !important;">

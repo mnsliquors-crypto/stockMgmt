@@ -29,7 +29,7 @@ $canApprove = $order && $isAdmin && $order['status'] === 'pending' && (int)$orde
 ?>
 <link rel="stylesheet" href="<?php echo base_url ?>dist/css/procurement.css?v=1">
 <div class="procurement-workspace py-3">
-    <div class="po-print-brand"><?php $printLogo = validate_image($_settings->info('logo')); if (!str_contains($printLogo, 'no-image-available')): ?><img src="<?php echo $escape($printLogo) ?>" alt="Company logo"><?php endif ?><div><h3><?php echo $escape($_settings->info('name') ?: 'MNS LIQUORS') ?></h3><span>Purchase Order</span></div></div>
+    <div class="po-print-brand"><?php $printLogo = validate_image($_settings->info('logo')); if (!str_contains($printLogo, 'no-image-available')): ?><img src="<?php echo $escape($printLogo) ?>" alt="Company logo"><?php endif ?><div><h3><?php echo $escape($_settings->info('name') ?: 'Company') ?></h3><span>Purchase Order</span></div></div>
     <?php if ($order): ?><section class="po-print-document">
         <h4><?php echo $escape($order['reference']) ?></h4>
         <dl class="row"><dt class="col-2">Supplier</dt><dd class="col-10"><?php echo $escape($order['vendor_name']) ?></dd><dt class="col-2">Order Date</dt><dd class="col-4"><?php echo $order['order_date'] ?></dd><dt class="col-2">Expected</dt><dd class="col-4"><?php echo $escape($order['expected_date'] ?? '') ?></dd></dl>

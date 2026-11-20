@@ -1,4 +1,4 @@
-# Friend Version Merge
+# Karyasetu Enterprise Platform: V3 Update
 
 Source: `/Users/bdahal/Downloads/sms-main.zip`, archive revision
 `9f669fa329e464a80735eea3c232054098f893b4`.
@@ -11,9 +11,9 @@ The current accounting journals, purchasing approvals, and business data remain
 authoritative. The existing installed dependencies are used; no CDN packages or
 new software are required.
 
-## Comparison And Delivery
+## Delivery Status
 
-| Capability in the archive | Existing application | Merge status |
+| V3 capability | Previous capability | Update status |
 | --- | --- | --- |
 | Executive dashboard, preferences, theme, shortcuts, account/cash drilldowns | Basic dashboard | Adapted; real metrics, seven charts, per-user settings, responsive layout |
 | Per-location inventory and internal stock transfers | Aggregate inventory | Added location stock/as-of balances, immutable transfers and reversals |
@@ -41,7 +41,7 @@ must not be copied.
 
 ## Data And Accounting Decisions
 
-- `003_friend_features` creates sidecar tables, views, guards, and one Main Store
+- Migration 003 creates sidecar tables, views, guards, and one Main Store
   location. It does not import archive records or rewrite existing transactions.
   Legacy inventory is treated as Main Store unless explicitly assigned later.
 - Existing inward-weighted item costing remains authoritative. Historical costs
@@ -58,7 +58,7 @@ must not be copied.
   carry through the posted ledger; reopening is explicit and audited.
 - Credits reallocate an existing posted return credit and do not duplicate cash,
   inventory, tax, or general-ledger entries. Standalone non-return credit memo
-  authoring is not part of this merge; use reviewed accounting journals where
+  authoring is not part of this update; use reviewed accounting journals where
   appropriate rather than fabricating returned stock.
 - Existing document-level VAT is retained. Mixed per-line VAT rates from the
   archive have not been grafted onto the legacy tax model. The report center does
@@ -66,9 +66,31 @@ must not be copied.
 - WhatsApp opens only after an explicit action on the reviewed draft. Automatic
   provider delivery requires a separately configured provider and consent policy.
   eSewa QR remains disabled until a verified merchant payload is supplied; the
-  friend's payment QR and third-party QR image service are not copied.
+  source archive's payment QR and third-party QR image service are not copied.
 - Existing import/export and administrator backup tools remain in place. The
   archive's arbitrary SQL restore and demo password-reset behavior are excluded.
+
+## Remaining V3 Work
+
+| Priority | Item | Current state | Required work |
+| --- | --- | --- | --- |
+| High | Mixed per-line VAT | Document-level tax is supported | Add line tax codes/rates and reconcile totals, returns, receipts, journals, and tax reports |
+| High | Standalone customer credit notes and supplier credits | Existing posted return credits can be allocated/reversed | Add non-return credits, approval/posting, applications, reversals, and tax handling without fictitious stock movements |
+| High | Classified cash-flow statement | Cash/bank counterpart analysis is available | Add operating/investing/financing mappings, opening/closing reconciliation, and treatment of manual journals/non-cash movements |
+| Medium | Frozen fiscal-close reports | Fiscal years close/reopen with period locks | Capture versioned trial-balance, income, and balance-sheet snapshots with close previews and a snapshot viewer; retain old snapshots after reopening |
+| Integration | Dynamic eSewa payment QR | Payment accounts exist; payment QR is not integrated | Obtain a verified merchant payload, generate amount-specific QR locally, and distinguish displayed QR from provider-verified payment |
+| Integration | Automatic WhatsApp delivery | Reviewed, editable WhatsApp drafts work | Configure an approved provider, credentials, recipient consent, delivery logs, and retry controls |
+| Security | Self-service password recovery | Administrator password management works | Implement private verification-code delivery, expiry, rate limits, single-use tokens, and session invalidation; never return codes/tokens to anonymous callers |
+| Security hardening | Validated database restore workflow | Administrator Git-based backup/restore and CSV import/export already exist | Add isolated restore validation, backup verification, reauthentication, and an audited maintenance workflow; do not expose arbitrary SQL execution |
+
+Automatic year-end opening/closing journal creation is a separate accounting-policy
+decision, not a missing stock carry-forward: the posted ledger already carries
+balances. It must not introduce duplicate balances or delete posted history on
+reopening.
+
+The public release label is `V3 Update`. Migration filenames and documentation use
+that name. The existing deployed schema ledger key remains a private compatibility
+detail so an upgrade cannot accidentally run migration 003 twice.
 
 ## Verification
 
